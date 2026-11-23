@@ -6,7 +6,7 @@
 
 | ID | Fase | Estado | Avance |
 | :--- | :--- | :---: | :---: |
-| F1 | Monorepo, Infraestructura y Catálogo | `[~]` | `25%` |
+| F1 | Monorepo, Infraestructura y Catálogo | `[~]` | `50%` |
 | F2 | Usuarios, Deck Builder y Mazos Prearmados | `[ ]` | `0%` |
 | F3 | Motor PvE Básico (MVP Jugable vs. Máquina) | `[ ]` | `0%` |
 | F4 | Reglas Completas e IA Mejorada | `[ ]` | `0%` |
@@ -16,7 +16,7 @@
 ## F1 — Monorepo, Infraestructura y Catálogo
 
 - [x] **F1.1** — Inicializar `/backend` (Spring Boot 3.x + Java 21 + Maven), `/frontend` (Angular 18+ Standalone) y `/database` (`docker-compose.yml` PostgreSQL 16 + integración Flyway). | *Módulos/archivos:* `/backend`, `/frontend`, `/database`. | *Hecho:* PostgreSQL levantado, `mvn test` y `ng build` pasan en verde.
-- [ ] **F1.2** — Crear migración `V1__catalog_schema.sql`, cliente `RestClient` a TCGdex v2 y servicio de sincronización idempotente del set `base1`. | *Módulos/archivos:* `catalog-sync`, `/database/migrations`. | *Hecho:* set `base1` sincronizado en PostgreSQL y test unitario con mock de TCGdex en verde.
+- [x] **F1.2** — Crear migración `V1__catalog_schema.sql`, cliente `RestClient` a TCGdex v2 y servicio de sincronización idempotente del set `base1`. | *Módulos/archivos:* `catalog-sync`, `/database/migrations`. | *Hecho:* set `base1` sincronizado en PostgreSQL y test unitario con mock de TCGdex en verde.
 - [ ] **F1.3** — Exponer API REST de catálogo (`GET /api/sets`, `GET /api/cards` paginado/filtrable, `GET /api/cards/{id}`, `POST /api/admin/catalog/sync`). | *Módulos/archivos:* `catalog-sync`. | *Hecho:* filtros y paginación verificados por tests de integración/controlador y consulta HTTP.
 - [ ] **F1.4** — Implementar layout base, routing, Home (`/`) con accesos rápidos, tokens de `docs/design.md`, `CardTile`, `CardDetailModal` y Catálogo (`/catalog`) con grilla paginada, buscador por nombre y filtros por tipo y categoría. | *Módulos/archivos:* `web-app-core`, `docs/design.md`. | *Hecho:* catálogo navegable en navegador consumiendo solo `/api/**` local.
 
@@ -66,3 +66,4 @@
 | :--- | :--- | :--- | :--- |
 | 2026-11-23 | Docs | Estructura modular del monorepo creada (`AGENTS.md`, `docs/*`, 8 skills en `.agent/skills/` con `web-app-core` y `web-battle-board` + pantallas/HUD), reglas Git, `.gitignore` y repositorio inicializado en `main`. | F1.1 |
 | 2026-11-23 | F1.1 | Infraestructura base creada (`/database` PostgreSQL 16 + `V0__baseline.sql`, `/backend` Spring Boot 3.3.5 + Flyway sin H2, `/frontend` Angular 18+ Standalone + `_tokens.scss`). Verificado: contenedor `pokemontcg-postgres` healthy, `mvn test` (2/2) y `ng build` en verde. | F1.2 |
+| 2026-11-23 | F1.2 | Creada migración `V1__catalog_schema.sql` (`card_sets`, `cards` con `sort_order` y columnas explícitas + `card_types`), `TcgdexClient`, `CatalogSyncService` (HTTP fuera de transacción) y `CatalogPersistenceService` (`@Transactional`). Verificado: Flyway aplicó `V1`, `mvn test` (7/7) en verde y `base1` sincronizado en PostgreSQL (102 cartas: 69 Pokémon, 26 Trainer, 6 Basic Energy, 1 Special Energy). | F1.3 |

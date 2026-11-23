@@ -23,6 +23,6 @@ pokemontcg:
   tcgdex:
     base-url: https://api.tcgdex.net/v2
   catalog:
-    startup-sync: ${CATALOG_STARTUP_SYNC:false}
+    startup-sync: ${CATALOG_STARTUP_SYNC:true}
     default-set-id: base1
     default-lang: en
