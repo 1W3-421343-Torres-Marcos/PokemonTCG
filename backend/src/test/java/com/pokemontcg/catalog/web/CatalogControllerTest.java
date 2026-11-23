@@ -1,5 +1,8 @@
 package com.pokemontcg.catalog.web;
 
+import com.pokemontcg.auth.security.JwtAuthenticationFilter;
+import com.pokemontcg.auth.security.JwtService;
+import com.pokemontcg.auth.security.SecurityConfig;
 import com.pokemontcg.catalog.domain.CardAttack;
 import com.pokemontcg.catalog.domain.CardTypeModifier;
 import com.pokemontcg.catalog.dto.CardDetailDTO;
@@ -14,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -28,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest({CatalogController.class, CatalogAdminController.class})
+@Import({SecurityConfig.class, JwtAuthenticationFilter.class})
 class CatalogControllerTest {
 
     @Autowired
@@ -38,6 +44,9 @@ class CatalogControllerTest {
 
     @MockBean
     private CatalogSyncService catalogSyncService;
+
+    @MockBean
+    private JwtService jwtService;
 
     @Test
     void listSetsReturnsSyncedSets() throws Exception {
@@ -106,6 +115,7 @@ class CatalogControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void adminSyncTriggersSetSync() throws Exception {
         when(catalogSyncService.syncSet("base1", "en"))
                 .thenReturn(new SyncResultDTO("base1", "en", 102, Instant.now()));
@@ -116,5 +126,12 @@ class CatalogControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.setId").value("base1"))
                 .andExpect(jsonPath("$.syncedCards").value(102));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void adminSyncRejectsNonAdminUser() throws Exception {
+        mockMvc.perform(post("/api/admin/catalog/sync"))
+                .andExpect(status().isForbidden());
     }
 }
