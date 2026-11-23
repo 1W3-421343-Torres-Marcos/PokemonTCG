@@ -19,9 +19,7 @@ import { AuthStore } from '../../auth/auth.store';
             <a routerLink="/" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }">Inicio</a>
             <a routerLink="/catalog" routerLinkActive="is-active">Catálogo</a>
             <a routerLink="/decks" routerLinkActive="is-active">Mis Mazos</a>
-            <a routerLink="/play/setup" routerLinkActive="is-active" class="nav-upcoming">
-              Jugar vs. CPU <span class="badge">F3</span>
-            </a>
+            <a routerLink="/play/setup" routerLinkActive="is-active">Jugar vs. CPU</a>
 
             @if (authStore.isAuthenticated()) {
               <div class="user-menu">

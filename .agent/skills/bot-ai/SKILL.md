@@ -31,6 +31,6 @@ Oponente CPU basado en heurísticas en **Java 21 puro**, justo por diseño (solo
 - `backend/src/test/java/com/pokemontcg/bot/**`
 
 ## Criterios de aceptación
-- [ ] Cero imports de Spring/JPA en `com.pokemontcg.bot`; el Bot recibe exclusivamente `PlayerViewDTO`.
-- [ ] `BasicBotStrategy` y `BotTurnRunner` completan partidas Bot vs. Bot en JUnit 5 sin errores ni loops infinitos (F3).
+- [x] Cero imports de Spring/JPA en `com.pokemontcg.bot`; el Bot recibe exclusivamente `PlayerViewDTO`.
+- [x] `BasicBotStrategy` y `BotTurnRunner` completan partidas Bot vs. Bot en JUnit 5 sin errores ni loops infinitos (F3).
 - [ ] `TacticalBotStrategy` usa evoluciones, ventaja de tipo, retirada y Entrenadores en simulaciones JUnit 5 (F4).

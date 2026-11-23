@@ -26,5 +26,5 @@ Flujo completo de combate PvE en Angular 18+: configuración de partida contra l
 - `frontend/src/app/shared/ui/**`
 
 ## Criterios de aceptación
-- [ ] Setup `/play/setup` y Tablero `/play/:matchId` con Zona Rival, Zona Jugador, HUD de turno/fase/ataques, descarte inspeccionable, Historial de Combate secuencial y modal Victoria/Derrota operativos en F3.
+- [x] Setup `/play/setup` y Tablero `/play/:matchId` con Zona Rival, Zona Jugador, HUD de turno/fase/ataques, descarte inspeccionable, Historial de Combate secuencial y modal Victoria/Derrota operativos en F3.
 - [ ] Acciones completas (`EVOLVE`, `RETREAT`, `PLAY_TRAINER`), resaltado de cartas jugables en mano, íconos de estado alterado y animaciones secuenciales de `List<GameEvent>` operativos en F4.

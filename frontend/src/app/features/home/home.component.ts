@@ -1,5 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
+import { catchError, of, switchMap } from 'rxjs';
+import { MatchApiService } from '../../core/api/match-api.service';
 import { AuthStore } from '../../core/auth/auth.store';
 
 @Component({
@@ -44,13 +47,23 @@ import { AuthStore } from '../../core/auth/auth.store';
         </section>
       }
 
-      <section class="resume-banner" aria-label="Partida en curso">
-        <div>
-          <strong>¿Partida en progreso?</strong>
-          <span>Cuando empieces a combatir en F3, podrás retomar aquí tu última partida contra la CPU.</span>
-        </div>
-        <a routerLink="/play/setup" class="resume-link">Ir a Setup →</a>
-      </section>
+      @if (activeMatch(); as match) {
+        <section class="resume-banner active-match" aria-label="Partida en curso">
+          <div>
+            <strong>Partida en curso · Turno {{ match.turnNumber }}</strong>
+            <span>{{ match.playerDeckName }} vs. {{ match.cpuDeckName }} ({{ match.botDifficulty }})</span>
+          </div>
+          <a [routerLink]="['/play', match.matchId]" class="cta-primary">Retomar partida en curso →</a>
+        </section>
+      } @else {
+        <section class="resume-banner" aria-label="Partida rápida">
+          <div>
+            <strong>¿Listo para combatir contra la CPU?</strong>
+            <span>Elige tu mazo de 60 cartas, selecciona el rival y juega por turnos en el tablero PvE.</span>
+          </div>
+          <a routerLink="/play/setup" class="resume-link">Configurar Partida →</a>
+        </section>
+      }
 
       <section class="quick-grid" aria-label="Accesos rápidos">
         <a routerLink="/catalog" class="quick-card">
@@ -65,8 +78,8 @@ import { AuthStore } from '../../core/auth/auth.store';
           <p>Constructor de 60 cartas con validación en vivo y mazos prearmados listos para clonar.</p>
         </a>
 
-        <a routerLink="/play/setup" class="quick-card upcoming">
-          <span class="pill soon">Fase 3</span>
+        <a routerLink="/play/setup" class="quick-card">
+          <span class="pill ready">Disponible</span>
           <h2>Jugar vs. CPU</h2>
           <p>Selecciona tu mazo, elige la dificultad del Bot y combate en un tablero interactivo con historial.</p>
         </a>
@@ -145,6 +158,11 @@ import { AuthStore } from '../../core/auth/auth.store';
     }
     .resume-banner strong { display: block; font-size: var(--text-sm); }
     .resume-banner span { font-size: var(--text-xs); color: var(--text-secondary); }
+    .resume-banner.active-match {
+      border-style: solid;
+      border-color: rgba(255, 203, 5, 0.45);
+      background: linear-gradient(135deg, #131b2e 0%, #1c2742 100%);
+    }
     .resume-link { font-size: var(--text-sm); font-weight: 600; color: var(--accent-secondary); }
     .quick-grid {
       display: grid;
@@ -175,4 +193,14 @@ import { AuthStore } from '../../core/auth/auth.store';
 })
 export class HomeComponent {
   protected readonly authStore = inject(AuthStore);
+  private readonly matchApi = inject(MatchApiService);
+
+  protected readonly activeMatch = toSignal(
+    toObservable(this.authStore.isAuthenticated).pipe(
+      switchMap((authenticated) =>
+        authenticated ? this.matchApi.getActiveMatch().pipe(catchError(() => of(null))) : of(null)
+      )
+    ),
+    { initialValue: null }
+  );
 }

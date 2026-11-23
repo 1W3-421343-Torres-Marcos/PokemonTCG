@@ -31,7 +31,7 @@ Capa Spring Boot que persiste el estado de partidas PvE en PostgreSQL, adapta ca
 - `backend/src/test/java/com/pokemontcg/match/**`
 
 ## Criterios de aceptación
-- [ ] Migración `V4__matches_schema.sql` aplicada limpiamente con `state_json` (`JSONB`) y `@Version`.
-- [ ] `POST /api/matches` y `POST /api/matches/{id}/actions` devuelven `PlayerViewDTO` (ocultando mano/mazo CPU) y `List<GameEvent>` cronológica.
-- [ ] Al finalizar una partida (`GAME_OVER` o rendición), el resultado persiste y actualiza estadísticas del usuario en `auth-users`.
-- [ ] Tests de controlador/integración validan reglas de propiedad (`403`), acción ilegal (`400`) y ciclo completo humano + Bot.
+- [x] Migración `V4__matches_schema.sql` aplicada limpiamente con `state_json` (`JSONB`) y `@Version`.
+- [x] `POST /api/matches` y `POST /api/matches/{id}/actions` devuelven `PlayerViewDTO` (ocultando mano/mazo CPU) y `List<GameEvent>` cronológica.
+- [x] Al finalizar una partida (`GAME_OVER` o rendición), el resultado persiste y actualiza estadísticas del usuario en `auth-users`.
+- [x] Tests de controlador/integración validan reglas de propiedad (`403`), acción ilegal (`400`) y ciclo completo humano + Bot.

@@ -32,15 +32,15 @@ export const routes: Routes = [
   },
   {
     path: 'play/setup',
+    canActivate: [authGuard],
     loadComponent: () =>
-      import('./shared/ui/feature-placeholder/feature-placeholder.component').then(
-        (m) => m.FeaturePlaceholderComponent
-      ),
-    data: {
-      phase: 'Fase 3',
-      title: 'Combate PvE vs. CPU (Próximamente)',
-      description: 'Aquí elegirás tu mazo, el mazo rival y la dificultad del Bot para iniciar una partida.'
-    }
+      import('./features/play/match-setup-page.component').then((m) => m.MatchSetupPageComponent)
+  },
+  {
+    path: 'play/:matchId',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/play/battle-board-page.component').then((m) => m.BattleBoardPageComponent)
   },
   {
     path: 'login',
