@@ -32,7 +32,7 @@ Integración servidor-servidor con TCGdex API v2, almacenamiento local en Postgr
 - `backend/src/test/java/com/pokemontcg/catalog/**`
 
 ## Criterios de aceptación
-- [ ] Migración `V1__catalog_schema.sql` aplicada limpiamente en PostgreSQL vía Flyway.
-- [ ] Sincronización de `base1` completada e idempotente (re-ejecutar mantiene conteo exacto sin errores).
-- [ ] Endpoints `GET /api/sets`, `GET /api/cards` (filtros + paginación) y `GET /api/cards/{id}` verificados.
-- [ ] Tests unitarios de `TcgdexClient` / servicio de sincronización con payload mockeado en verde.
+- [x] Migración `V1__catalog_schema.sql` aplicada limpiamente en PostgreSQL vía Flyway.
+- [x] Sincronización de `base1` completada e idempotente (re-ejecutar mantiene conteo exacto sin errores).
+- [x] Endpoints `GET /api/sets`, `GET /api/cards` (filtros + paginación) y `GET /api/cards/{id}` verificados.
+- [x] Tests unitarios de `TcgdexClient` / servicio de sincronización con payload mockeado en verde.

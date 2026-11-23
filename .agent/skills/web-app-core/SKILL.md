@@ -33,7 +33,7 @@ Núcleo de la SPA Angular 18+ en `/frontend` fuera del tablero de combate: layou
 - `frontend/src/app/features/deck-builder/**`
 
 ## Criterios de aceptación
-- [ ] Layout base, tokens de `docs/design.md`, Home (`/`) con accesos rápidos y `/catalog` paginado/filtrable con modal de detalle operativos en F1.
+- [x] Layout base, tokens de `docs/design.md`, Home (`/`) con accesos rápidos y `/catalog` paginado/filtrable con modal de detalle operativos en F1.
 - [ ] `/login` y `/register` con formularios reactivos, `AuthStore`, interceptor JWT y `authGuard` operativos en F2.
 - [ ] `/decks` (propios y *starter decks* clonables) y editor a 2 paneles `/decks/:id` con `DeckValidationBar` en vivo operativos en F2.
 - [ ] Opción de retomar partida activa (`IN_PROGRESS`) desde Home (`/`) operativa en F3.
