@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
+import { AuthStore } from '../../core/auth/auth.store';
 import { CardDetailModalComponent } from '../../shared/ui/card-detail-modal/card-detail-modal.component';
 import { CardTileComponent } from '../../shared/ui/card-tile/card-tile.component';
 import { EnergyBadgeComponent } from '../../shared/ui/energy-badge/energy-badge.component';
@@ -99,6 +100,9 @@ import { CatalogStore } from './catalog.store';
         [isOpen]="store.isModalOpen()"
         [loading]="store.detailLoading()"
         [card]="store.selectedCard()"
+        [showFavorite]="authStore.isAuthenticated()"
+        [isFavorite]="store.selectedCard() ? authStore.favoriteCardIds().has(store.selectedCard()!.id) : false"
+        (favoriteToggled)="authStore.toggleFavorite($event)"
         (closed)="store.closeCardDetail()" />
     </div>
   `,
@@ -223,6 +227,7 @@ import { CatalogStore } from './catalog.store';
 })
 export class CatalogPageComponent implements OnInit {
   protected readonly store = inject(CatalogStore);
+  protected readonly authStore = inject(AuthStore);
 
   protected readonly categories = [
     { label: 'Todas', value: '' },

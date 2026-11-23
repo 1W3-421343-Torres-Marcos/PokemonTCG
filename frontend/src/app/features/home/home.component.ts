@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { AuthStore } from '../../core/auth/auth.store';
 
 @Component({
   selector: 'app-home',
@@ -16,9 +17,32 @@ import { RouterLink } from '@angular/router';
         </p>
         <div class="hero-actions">
           <a routerLink="/catalog" class="cta-primary">Explorar Catálogo</a>
-          <a routerLink="/play/setup" class="cta-secondary">Configurar Partida (F3)</a>
+          <a routerLink="/decks" class="cta-secondary">Mis Mazos</a>
         </div>
       </section>
+
+      @if (authStore.user(); as profile) {
+        <section class="profile-summary" aria-label="Perfil de entrenador">
+          <div>
+            <span class="summary-label">Entrenador conectado</span>
+            <h2>{{ profile.username }}</h2>
+          </div>
+          <div class="summary-stats">
+            <div class="stat-chip">
+              <span class="mono-num">{{ profile.matchesPlayed }}</span>
+              <small>Partidas</small>
+            </div>
+            <div class="stat-chip">
+              <span class="mono-num">{{ profile.matchesWon }}</span>
+              <small>Victorias</small>
+            </div>
+            <div class="stat-chip">
+              <span class="mono-num">{{ profile.favoriteCardIds.length }}</span>
+              <small>Favoritas</small>
+            </div>
+          </div>
+        </section>
+      }
 
       <section class="resume-banner" aria-label="Partida en curso">
         <div>
@@ -35,8 +59,8 @@ import { RouterLink } from '@angular/router';
           <p>Busca por nombre, filtra por tipo o categoría e inspecciona ataques y debilidades en alta resolución.</p>
         </a>
 
-        <a routerLink="/decks" class="quick-card upcoming">
-          <span class="pill soon">Fase 2</span>
+        <a routerLink="/decks" class="quick-card">
+          <span class="pill ready">Disponible</span>
           <h2>Mis Mazos</h2>
           <p>Constructor de 60 cartas con validación en vivo y mazos prearmados listos para clonar.</p>
         </a>
@@ -56,7 +80,7 @@ import { RouterLink } from '@angular/router';
       padding: var(--space-8) var(--space-5);
       display: flex;
       flex-direction: column;
-      gap: var(--space-6);
+      gap: var(--space-5);
     }
     .hero {
       padding: var(--space-8);
@@ -85,6 +109,29 @@ import { RouterLink } from '@angular/router';
     }
     .cta-primary { background: var(--accent-primary); color: #0b1020; }
     .cta-secondary { background: var(--bg-tabletop); border: 1px solid var(--border-subtle); color: var(--text-primary); }
+    .profile-summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+      padding: var(--space-4) var(--space-5);
+      border-radius: var(--radius-lg);
+      background: var(--bg-surface);
+      border: 1px solid rgba(255, 203, 5, 0.25);
+    }
+    .summary-label { font-size: var(--text-xs); color: var(--accent-primary); text-transform: uppercase; font-weight: 700; }
+    .profile-summary h2 { font-size: var(--text-xl); margin-top: 2px; }
+    .summary-stats { display: flex; gap: var(--space-4); }
+    .stat-chip {
+      text-align: center;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-md);
+      background: var(--bg-tabletop);
+      border: 1px solid var(--border-subtle);
+    }
+    .stat-chip span { display: block; font-size: var(--text-lg); font-weight: 700; color: var(--accent-primary); }
+    .stat-chip small { font-size: var(--text-xs); color: var(--text-muted); }
     .resume-banner {
       display: flex;
       justify-content: space-between;
@@ -126,4 +173,6 @@ import { RouterLink } from '@angular/router';
   `],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class HomeComponent {}
+export class HomeComponent {
+  protected readonly authStore = inject(AuthStore);
+}

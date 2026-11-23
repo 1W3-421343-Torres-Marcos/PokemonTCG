@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { guestGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
   {
@@ -19,7 +20,7 @@ export const routes: Routes = [
       ),
     data: {
       phase: 'Fase 2',
-      title: 'Deck Builder (Próximamente)',
+      title: 'Deck Builder (En construcción)',
       description: 'Aquí podrás crear, editar y validar tus mazos de 60 cartas y clonar starter decks.'
     }
   },
@@ -37,27 +38,15 @@ export const routes: Routes = [
   },
   {
     path: 'login',
+    canActivate: [guestGuard],
     loadComponent: () =>
-      import('./shared/ui/feature-placeholder/feature-placeholder.component').then(
-        (m) => m.FeaturePlaceholderComponent
-      ),
-    data: {
-      phase: 'Fase 2',
-      title: 'Iniciar Sesión (Próximamente)',
-      description: 'La autenticación JWT y perfil de entrenador estarán disponibles en la Fase 2.'
-    }
+      import('./features/auth/login-page.component').then((m) => m.LoginPageComponent)
   },
   {
     path: 'register',
+    canActivate: [guestGuard],
     loadComponent: () =>
-      import('./shared/ui/feature-placeholder/feature-placeholder.component').then(
-        (m) => m.FeaturePlaceholderComponent
-      ),
-    data: {
-      phase: 'Fase 2',
-      title: 'Registro de Entrenador (Próximamente)',
-      description: 'El registro de nuevas cuentas estará disponible en la Fase 2.'
-    }
+      import('./features/auth/register-page.component').then((m) => m.RegisterPageComponent)
   },
   {
     path: '**',

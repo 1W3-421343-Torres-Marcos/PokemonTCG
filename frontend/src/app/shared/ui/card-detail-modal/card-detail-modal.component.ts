@@ -31,9 +31,20 @@ import { EnergyBadgeComponent } from '../energy-badge/energy-badge.component';
                     <span class="set-pill">{{ c.setName }} · <span class="mono-num">#{{ c.localId }}</span></span>
                     <h2>{{ c.name }}</h2>
                   </div>
-                  @if (c.hp !== null) {
-                    <span class="hp-pill mono-num">{{ c.hp }} PS</span>
-                  }
+                  <div class="header-actions">
+                    @if (c.hp !== null) {
+                      <span class="hp-pill mono-num">{{ c.hp }} PS</span>
+                    }
+                    @if (showFavorite()) {
+                      <button
+                        type="button"
+                        class="fav-btn"
+                        [class.is-fav]="isFavorite()"
+                        (click)="favoriteToggled.emit(c.id)">
+                        @if (isFavorite()) { ★ Favorita } @else { ☆ Favorita }
+                      </button>
+                    }
+                  </div>
                 </div>
 
                 <div class="tag-row">
@@ -236,6 +247,26 @@ import { EnergyBadgeComponent } from '../energy-badge/energy-badge.component';
       font-size: var(--text-xs);
       color: var(--text-muted);
     }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .fav-btn {
+      padding: 5px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-elevated);
+      color: var(--text-secondary);
+      font-size: var(--text-xs);
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .fav-btn.is-fav {
+      border-color: var(--accent-primary);
+      color: var(--accent-primary);
+      background: rgba(255, 203, 5, 0.14);
+    }
     @media (max-width: 720px) {
       .modal-grid { grid-template-columns: 1fr; }
       .art-col { max-width: 240px; margin: 0 auto; }
@@ -247,7 +278,10 @@ export class CardDetailModalComponent {
   readonly card = input<CardDetail | null>(null);
   readonly loading = input<boolean>(false);
   readonly isOpen = input<boolean>(false);
+  readonly showFavorite = input<boolean>(false);
+  readonly isFavorite = input<boolean>(false);
   readonly closed = output<void>();
+  readonly favoriteToggled = output<string>();
 
   @HostListener('document:keydown.escape')
   onEscape(): void {

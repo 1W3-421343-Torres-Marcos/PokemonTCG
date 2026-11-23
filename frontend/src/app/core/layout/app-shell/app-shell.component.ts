@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { AuthStore } from '../../auth/auth.store';
 
 @Component({
   selector: 'app-shell',
@@ -17,15 +18,20 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
           <nav class="nav" aria-label="Navegación principal">
             <a routerLink="/" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }">Inicio</a>
             <a routerLink="/catalog" routerLinkActive="is-active">Catálogo</a>
-            <a routerLink="/decks" routerLinkActive="is-active" class="nav-upcoming">
-              Mis Mazos <span class="badge">F2</span>
-            </a>
+            <a routerLink="/decks" routerLinkActive="is-active">Mis Mazos</a>
             <a routerLink="/play/setup" routerLinkActive="is-active" class="nav-upcoming">
               Jugar vs. CPU <span class="badge">F3</span>
             </a>
-            <a routerLink="/login" routerLinkActive="is-active" class="nav-upcoming">
-              Iniciar Sesión <span class="badge">F2</span>
-            </a>
+
+            @if (authStore.isAuthenticated()) {
+              <div class="user-menu">
+                <span class="user-pill">{{ authStore.user()?.username ?? 'Entrenador' }}</span>
+                <button type="button" class="logout-btn" (click)="authStore.logout()">Salir</button>
+              </div>
+            } @else {
+              <a routerLink="/login" routerLinkActive="is-active">Iniciar Sesión</a>
+              <a routerLink="/register" routerLinkActive="is-active" class="register-cta">Registro</a>
+            }
           </nav>
         </div>
       </header>
@@ -99,16 +105,13 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
       color: var(--text-secondary);
       transition: background-color 0.15s ease, color 0.15s ease;
     }
-    .nav a:hover {
+    .nav a:hover { background: var(--bg-elevated); color: var(--text-primary); }
+    .nav a.is-active { background: rgba(255, 203, 5, 0.14); color: var(--accent-primary); }
+    .nav-upcoming { opacity: 0.72; }
+    .register-cta {
+      border: 1px solid var(--border-subtle);
       background: var(--bg-elevated);
-      color: var(--text-primary);
-    }
-    .nav a.is-active {
-      background: rgba(255, 203, 5, 0.14);
-      color: var(--accent-primary);
-    }
-    .nav-upcoming {
-      opacity: 0.72;
+      color: var(--text-primary) !important;
     }
     .badge {
       font-size: 10px;
@@ -119,10 +122,36 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
       border: 1px solid var(--border-subtle);
       color: var(--text-muted);
     }
-    .main-content {
-      flex: 1;
+    .user-menu {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-left: var(--space-2);
+      padding-left: var(--space-2);
+      border-left: 1px solid var(--border-subtle);
     }
+    .user-pill {
+      font-size: var(--text-xs);
+      font-weight: 700;
+      color: var(--accent-primary);
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(255, 203, 5, 0.12);
+    }
+    .logout-btn {
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-tabletop);
+      color: var(--text-secondary);
+      font-size: var(--text-xs);
+      cursor: pointer;
+    }
+    .logout-btn:hover { color: var(--text-primary); border-color: var(--state-danger); }
+    .main-content { flex: 1; }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class AppShellComponent {}
+export class AppShellComponent {
+  protected readonly authStore = inject(AuthStore);
+}
