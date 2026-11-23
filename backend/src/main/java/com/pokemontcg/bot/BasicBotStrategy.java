@@ -14,10 +14,7 @@ import com.pokemontcg.engine.dto.PokemonViewDTO;
 import com.pokemontcg.engine.model.TurnPhase;
 
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -53,10 +50,10 @@ public class BasicBotStrategy implements BotStrategy {
 
     private GameAction chooseSetupAction(PlayerViewDTO botView) {
         List<CardViewDTO> basics = botView.myHand().stream()
-                .filter(this::isBasicPokemon)
+                .filter(BotCardHelper::isBasicPokemon)
                 .sorted(Comparator
                         .comparingInt((CardViewDTO c) -> -(c.hp() == null ? 0 : c.hp()))
-                        .thenComparingInt(c -> -maxAttackDamage(c.attacks()))
+                        .thenComparingInt(c -> -BotCardHelper.maxAttackDamage(c.attacks()))
                         .thenComparing(CardViewDTO::instanceId))
                 .toList();
 
@@ -89,7 +86,7 @@ public class BasicBotStrategy implements BotStrategy {
         // 1. Fill bench with available Basics
         if (botView.myBench().size() < MAX_BENCH_SIZE) {
             Optional<CardViewDTO> basicInHand = botView.myHand().stream()
-                    .filter(this::isBasicPokemon)
+                    .filter(BotCardHelper::isBasicPokemon)
                     .max(Comparator.comparingInt(c -> c.hp() == null ? 0 : c.hp()));
             if (basicInHand.isPresent()) {
                 return new PlayBasicAction(basicInHand.get().instanceId());
@@ -99,12 +96,12 @@ public class BasicBotStrategy implements BotStrategy {
         // 2. Attach 1 Energy per turn
         if (!botView.energyAttachedThisTurn()) {
             List<CardViewDTO> energiesInHand = botView.myHand().stream()
-                    .filter(this::isEnergy)
+                    .filter(BotCardHelper::isEnergy)
                     .toList();
             if (!energiesInHand.isEmpty()) {
                 Optional<PokemonViewDTO> target = selectEnergyTarget(botView);
                 if (target.isPresent()) {
-                    CardViewDTO chosenEnergy = selectBestEnergyForTarget(energiesInHand, target.get());
+                    CardViewDTO chosenEnergy = BotCardHelper.selectBestEnergyForTarget(energiesInHand, target.get());
                     return new AttachEnergyAction(chosenEnergy.instanceId(), target.get().instanceId());
                 }
             }
@@ -155,55 +152,5 @@ public class BasicBotStrategy implements BotStrategy {
 
     private boolean hasAnyUnpayableAttack(PokemonViewDTO pokemon) {
         return pokemon.attacks().stream().anyMatch(a -> !a.canPay());
-    }
-
-    private CardViewDTO selectBestEnergyForTarget(List<CardViewDTO> energies, PokemonViewDTO target) {
-        Optional<AttackViewDTO> priorityAttack = target.attacks().stream()
-                .filter(a -> !a.canPay())
-                .max(Comparator.comparingInt(AttackViewDTO::baseDamage));
-
-        if (priorityAttack.isPresent()) {
-            Map<String, Integer> attachedCounts = new HashMap<>();
-            for (CardViewDTO attached : target.attachedEnergies()) {
-                String type = normalizeType(attached.providedEnergyType());
-                attachedCounts.merge(type, Math.max(1, attached.providedEnergyCount()), Integer::sum);
-            }
-
-            for (String costType : priorityAttack.get().cost()) {
-                String normalized = normalizeType(costType);
-                if ("colorless".equals(normalized) || "free".equals(normalized)) {
-                    continue;
-                }
-                int available = attachedCounts.getOrDefault(normalized, 0);
-                if (available > 0) {
-                    attachedCounts.put(normalized, available - 1);
-                    continue;
-                }
-                Optional<CardViewDTO> exactMatch = energies.stream()
-                        .filter(e -> normalized.equals(normalizeType(e.providedEnergyType())))
-                        .findFirst();
-                if (exactMatch.isPresent()) {
-                    return exactMatch.get();
-                }
-            }
-        }
-
-        return energies.get(0);
-    }
-
-    private boolean isBasicPokemon(CardViewDTO card) {
-        return "Pokemon".equalsIgnoreCase(card.category()) && "Basic".equalsIgnoreCase(card.stage());
-    }
-
-    private boolean isEnergy(CardViewDTO card) {
-        return "Energy".equalsIgnoreCase(card.category());
-    }
-
-    private int maxAttackDamage(List<AttackViewDTO> attacks) {
-        return attacks.stream().mapToInt(AttackViewDTO::baseDamage).max().orElse(0);
-    }
-
-    private String normalizeType(String value) {
-        return value == null ? "colorless" : value.trim().toLowerCase(Locale.ROOT);
     }
 }

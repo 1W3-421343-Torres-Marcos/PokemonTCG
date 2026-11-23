@@ -130,4 +130,55 @@ class MatchIntegrationTest {
         UserEntity updatedUser = userRepository.findById(user.getId()).orElseThrow();
         assertThat(updatedUser.getMatchesPlayed()).isEqualTo(1);
     }
+
+    @Test
+    void supportsTacticalBotDifficultyAndMapsAdvancedActionPayloads() {
+        MatchActionRequest evolve = new MatchActionRequest(
+                MatchActionType.EVOLVE, null, null, null, null, "p-1", null, null, "ev-1", null, null
+        );
+        MatchActionRequest trainer = new MatchActionRequest(
+                MatchActionType.PLAY_TRAINER, null, null, null, null, "p-1", null, null, null, "tr-1", null
+        );
+        MatchActionRequest retreat = new MatchActionRequest(
+                MatchActionType.RETREAT, null, null, null, null, null, null, "b-1", null, null, List.of("e-1")
+        );
+
+        assertThat(evolve.toGameAction()).isInstanceOf(com.pokemontcg.engine.action.EvolveAction.class);
+        assertThat(trainer.toGameAction()).isInstanceOf(com.pokemontcg.engine.action.PlayTrainerAction.class);
+        assertThat(retreat.toGameAction()).isInstanceOf(com.pokemontcg.engine.action.RetreatAction.class);
+
+        UserEntity user = new UserEntity();
+        user.setId(UUID.randomUUID());
+        user.setUsername("tactical_tester_" + UUID.randomUUID().toString().substring(0, 8));
+        user.setEmail("tactical_" + UUID.randomUUID().toString().substring(0, 8) + "@test.local");
+        user.setPasswordHash("hashed");
+        user.setRole("USER");
+        user.setMatchesPlayed(0);
+        user.setMatchesWon(0);
+        user.setCreatedAt(Instant.now());
+        userRepository.saveAndFlush(user);
+
+        List<DeckEntity> starters = deckRepository.findByStarterTrueOrderByNameAsc();
+        MatchTurnResponse created = matchService.createMatch(
+                user.getId(),
+                new CreateMatchRequest(starters.get(0).getId(), starters.get(1).getId(), BotDifficulty.TACTICAL)
+        );
+        assertThat(created.botDifficulty()).isEqualTo(BotDifficulty.TACTICAL);
+
+        CardViewDTO firstBasic = created.playerView().myHand().stream()
+                .filter(c -> "Pokemon".equalsIgnoreCase(c.category()) && "Basic".equalsIgnoreCase(c.stage()))
+                .findFirst()
+                .orElseThrow();
+        MatchTurnResponse afterSetup = matchService.submitAction(
+                created.matchId(),
+                user.getId(),
+                new MatchActionRequest(
+                        MatchActionType.SELECT_SETUP,
+                        firstBasic.instanceId(), List.of(),
+                        null, null, null, null, null, null, null, null
+                )
+        );
+        assertThat(afterSetup.playerView().phase()).isEqualTo(TurnPhase.MAIN_PHASE);
+        assertThat(afterSetup.playerView().activePlayer()).isEqualTo(PlayerId.PLAYER);
+    }
 }

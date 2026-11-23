@@ -5,6 +5,7 @@ import com.pokemontcg.bot.BasicBotStrategy;
 import com.pokemontcg.bot.BotDifficulty;
 import com.pokemontcg.bot.BotStrategy;
 import com.pokemontcg.bot.BotTurnRunner;
+import com.pokemontcg.bot.TacticalBotStrategy;
 import com.pokemontcg.common.exception.ForbiddenException;
 import com.pokemontcg.common.exception.ResourceNotFoundException;
 import com.pokemontcg.deck.domain.DeckEntity;
@@ -214,8 +215,9 @@ public class MatchService {
     }
 
     private BotStrategy resolveStrategy(BotDifficulty difficulty) {
-        // Tactical strategy arrives in F4; delegate safely to BasicBotStrategy in F3.
-        return new BasicBotStrategy();
+        return difficulty == BotDifficulty.TACTICAL
+                ? new TacticalBotStrategy()
+                : new BasicBotStrategy();
     }
 
     private MatchTurnResponse toResponse(MatchEntity match, List<GameEvent> events) {

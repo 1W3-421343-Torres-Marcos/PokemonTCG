@@ -47,11 +47,13 @@ class BotArchitectureTest {
     }
 
     @Test
-    void basicBotStrategyNeverImportsOrReferencesGameStateDirectly() throws IOException {
-        Path strategyFile = Path.of("src/main/java/com/pokemontcg/bot/BasicBotStrategy.java");
-        String content = Files.readString(strategyFile);
+    void botStrategiesNeverImportOrReferenceGameStateDirectly() throws IOException {
+        for (String fileName : List.of("BasicBotStrategy.java", "TacticalBotStrategy.java", "BotCardHelper.java")) {
+            Path strategyFile = Path.of("src/main/java/com/pokemontcg/bot/" + fileName);
+            String content = Files.readString(strategyFile);
 
-        assertThat(content).doesNotContain("GameState");
-        assertThat(content).doesNotContain("PlayerState");
+            assertThat(content).doesNotContain("GameState");
+            assertThat(content).doesNotContain("PlayerState");
+        }
     }
 }
