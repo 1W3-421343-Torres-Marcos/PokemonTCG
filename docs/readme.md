@@ -25,7 +25,8 @@ Pokemon/
         ├── game-engine/SKILL.md
         ├── bot-ai/SKILL.md
         ├── match-api/SKILL.md
-        └── web-client/SKILL.md
+        ├── web-app-core/SKILL.md
+        └── web-battle-board/SKILL.md
 ```
 
 ## Mapa de documentación y módulos
@@ -41,4 +42,5 @@ Pokemon/
 | `game-engine` | `.agent/skills/game-engine/SKILL.md` | Motor puro en Java, máquina de estados, daño, estados alterados y efectos |
 | `bot-ai` | `.agent/skills/bot-ai/SKILL.md` | IA oponente justa (`PlayerViewDTO`), estrategias y simulación Bot vs. Bot |
 | `match-api` | `.agent/skills/match-api/SKILL.md` | Persistencia `JSONB` de partidas, endpoints PvE y flujo humano + turno CPU |
-| `web-client` | `.agent/skills/web-client/SKILL.md` | SPA Angular: catálogo, auth, deck builder, tablero y animador de eventos |
+| `web-app-core` | `.agent/skills/web-app-core/SKILL.md` | SPA Angular: shell, JWT guards, Auth, Home, Catálogo y Deck Builder |
+| `web-battle-board` | `.agent/skills/web-battle-board/SKILL.md` | SPA Angular: Setup (`/play/setup`), Tablero (`/play/:matchId`), HUD y `EventLogFeed` |

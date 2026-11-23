@@ -61,19 +61,33 @@ Estilo visual de mesa de juego oscura (`tabletop`) que prioriza la legibilidad d
 
 | Componente | Propósito | Inputs / Props clave | Estados visuales |
 | :--- | :--- | :--- | :--- |
-| `CardTile` | Renderizar carta en catálogo, deck builder o mano/tablero | `card`, `size` (`sm`/`md`/`lg`), `faceDown`, `selectable`, `selected` | Default, hover elevación, `selected` (`--shadow-active-glow`), `disabled`, reverso CSS/SVG |
-| `CardDetailModal` | Inspeccionar imagen HD, ataques, debilidad, resistencia y texto | `card`, `isOpen`, `canAddToDeck` | Abierto con backdrop blur, botones de acción contextuales |
+| `CardTile` | Renderizar carta en catálogo, deck builder, mano o tablero | `card`, `size` (`sm`/`md`/`lg`), `faceDown`, `playable`, `selected` | Default, hover elevación, `playable` (borde resaltado), `selected` (`--shadow-active-glow`), `disabled`, reverso CSS/SVG |
+| `CardDetailModal` | Inspección ampliada con `high.webp`, ataques, costos, debilidad, resistencia y texto | `card`, `isOpen`, `canAddToDeck` | Abierto con backdrop blur y acciones contextuales |
+| `DiscardPileModal` | Inspeccionar las cartas de la pila de descarte propia o rival | `cards`, `ownerLabel`, `isOpen` | Grilla compacta con apertura de `CardDetailModal` al clic |
+| `DeckValidationBar` | Barra en vivo del editor `/decks/:id` con reglas oficiales | `totalCount`, `maxCopiesOk`, `hasBasicPokemon`, `errors` | Inválido (`--state-danger`), completo válido (`--state-success`) |
 | `EnergyBadge` | Ícono + color oficial de un tipo de energía | `type`, `size` (`xs`/`sm`/`md`), `count` | Compacto (solo ícono) o apilado con contador |
 | `HpBar` | Barra de vida actual/máxima sobre Pokémon en juego | `currentHp`, `maxHp` | Verde (`>50%`), ámbar (`20–50%`), rojo (`<20%`), transición suave |
 | `StatusBadge` | Indicador de condición especial en Pokémon activo | `condition` (`POISONED`/`BURNED`/`ASLEEP`/`PARALYZED`/`CONFUSED`) | Pill coloreada con ícono SVG y tooltip explicativo |
 | `ActionButton` | Botón unificado de acciones de UI y combate | `variant` (`primary`/`secondary`/`danger`/`ghost`), `disabled`, `loading` | Default, hover, focus ring `--accent-primary`, disabled (`opacity: 0.45`) |
-| `EventLogFeed` | Historial cronológico legible de `List<GameEvent>` | `events`, `highlightedEventId`, `speed` (`1x`/`2x`) | Autoscroll al último evento, distinción visual Jugador vs. CPU |
-| `DeckCounterBar` | Indicador de cartas y validez en Deck Builder | `totalCount`, `isValid`, `validationErrors` | Inválido (`--state-danger`), completo válido (`--state-success`) |
+| `EventLogFeed` | Panel de Historial de Combate reproduciendo `List<GameEvent>` | `events`, `activeEventId`, `speed` (`1x`/`2x`) | Autoscroll al evento activo, distinción Jugador vs. CPU y controles `1x/2x`/Saltar |
+| `MatchResultModal` | Modal de Victoria/Derrota al finalizar partida | `winner`, `reason`, `turnCount`, `prizesTaken` | Banner Victoria (`--state-success`) o Derrota (`--state-danger`) + CTAs |
 
-## 5. Reglas de recursos visuales y layout
+## 5. Reglas de recursos visuales y animaciones
 
 - **Proporción oficial de carta**: Todas las miniaturas y ranuras usan `aspect-ratio: 5 / 7` con `object-fit: cover` para evitar deformaciones.
 - **Origen exclusivo de imágenes**: Las imágenes se cargan solo desde la URL provista por nuestro backend (`low.webp` en grillas, mano y tablero; `high.webp` en `CardDetailModal`), con `loading="lazy"` y un reverso local CSS/SVG como fallback. Prohibido hotlinking a `pokemontcg.io` o llamadas directas a TCGdex.
 - **Iconografía ligera**: Los símbolos de energía y estados alterados se implementan como SVG inline propios (sin librerías de íconos pesadas).
-- **Layout del tablero PvE**: En desktop (`≥1280×720`) el tablero ocupa `100dvh` sin scroll vertical de página: zona CPU arriba (mazo/descarte/premios/mano bocabajo + banca + activo), zona central de estado de turno y ataques, zona Jugador abajo (activo + banca + mano interactiva) y panel lateral colapsable para `EventLogFeed`.
-- **Animaciones y accesibilidad**: Transiciones UI de `200–350ms`; la cola de `GameEvent` anima a `450–700ms` por evento con selector `1x`/`2x` y botón *Saltar*. Respetar `@media (prefers-reduced-motion: reduce)` reduciendo desplazamientos y duraciones a `0ms`.
+- **Animaciones y accesibilidad**: Transiciones UI de `200–350ms`; la cola secuencial de `GameEvent` (turnos de la CPU) anima a `450–700ms` por evento con selector `1x`/`2x` y botón *Saltar*. Respetar `@media (prefers-reduced-motion: reduce)` reduciendo desplazamientos y duraciones a `0ms`.
+
+## 6. Layouts de pantallas y zonas del tablero
+
+- **`/login` y `/register`**: tarjeta centrada (`max-width: 420px`) sobre `--bg-tabletop` con formulario reactivo y mensajes de error en línea.
+- **`/` (Home)**: hero compacto + grilla de 3 accesos rápidos (**Catálogo**, **Mis Mazos**, **Jugar vs. CPU**) + banner destacado de **Retomar partida en curso** (`/play/:matchId`) cuando existe una partida activa.
+- **`/catalog`**: barra de filtros pegajosa (buscador por nombre, selector de tipo y categoría `Pokemon`/`Trainer`/`Energy`) + grilla responsiva paginada.
+- **`/decks` y `/decks/:id`**: en `/decks`, grilla de mazos propios y *starter decks* clonables; en `/decks/:id`, editor dividido en **2 paneles** (`55%` catálogo filtrable a la izquierda / `45%` mazo actual a la derecha) con `DeckValidationBar` fija superior.
+- **`/play/setup`**: flujo limpio en 3 pasos/tarjetas (mazo del jugador válido, mazo CPU elegible y dificultad `BASIC`/`TACTICAL`).
+- **`/play/:matchId` (`100dvh` sin scroll vertical en desktop `≥1280×720`)**:
+  - **Zona Rival (superior)**: mano oculta (dorsos + contador), contador de mazo, descarte inspeccionable, 6 premios boca abajo, banca (hasta 5 slots) y Pokémon Activo (PS, energías, estados).
+  - **Franja central / HUD**: indicador de turno y fase, menú de ataques habilitados según energía adherida, y botones **Retirar**, **Terminar Turno** y **Rendirse**.
+  - **Zona Jugador (inferior)**: Pokémon Activo, banca (hasta 5 slots), 6 premios, mazo, descarte inspeccionable y mano interactiva con resaltado de cartas jugables según la fase.
+  - **Panel lateral colapsable**: `EventLogFeed` (Historial de Combate) con reproducción secuencial de los eventos del Bot.
