@@ -1,9 +1,12 @@
 package com.pokemontcg.common.exception;
 
+import com.pokemontcg.engine.exception.IllegalGameActionException;
+import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -42,6 +45,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiErrorDTO> handleBadRequest(IllegalArgumentException ex, HttpServletRequest request) {
         return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(IllegalGameActionException.class)
+    public ResponseEntity<ApiErrorDTO> handleIllegalGameAction(IllegalGameActionException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI());
+    }
+
+    @ExceptionHandler({ObjectOptimisticLockingFailureException.class, OptimisticLockException.class})
+    public ResponseEntity<ApiErrorDTO> handleOptimisticLock(Exception ex, HttpServletRequest request) {
+        return buildError(HttpStatus.CONFLICT, "Match state was modified concurrently. Refresh and retry.", request.getRequestURI());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
