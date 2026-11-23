@@ -181,10 +181,10 @@ class GameEngineTest {
                 new AttachEnergyAction(cpuEnergy.instanceId(), cpuActiveId)).state();
         GameState turn3 = engine.applyAction(cpuWithEnergy, PlayerId.CPU, new AttackAction(0)).state();
 
-        // After attack without KO, turn transitions to Turn 3 PLAYER
+        // After attack without KO, turn transitions to Turn 3 PLAYER (Squirtle Bubble 10 x 2 Water Weakness = 20)
         assertThat(turn3.turnNumber()).isEqualTo(3);
         assertThat(turn3.activePlayer()).isEqualTo(PlayerId.PLAYER);
-        assertThat(turn3.player(PlayerId.PLAYER).active().damage()).isEqualTo(10); // Squirtle Bubble = 10
+        assertThat(turn3.player(PlayerId.PLAYER).active().damage()).isEqualTo(20);
     }
 
     @Test

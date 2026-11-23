@@ -9,7 +9,7 @@
 | F1 | Monorepo, Infraestructura y Catálogo | `[x]` | `100%` |
 | F2 | Usuarios, Deck Builder y Mazos Prearmados | `[x]` | `100%` |
 | F3 | Motor PvE Básico (MVP Jugable vs. Máquina) | `[x]` | `100%` |
-| F4 | Reglas Completas e IA Mejorada | `[ ]` | `0%` |
+| F4 | Reglas Completas e IA Mejorada | `[~]` | `20%` |
 
 ---
 
@@ -50,7 +50,7 @@
 
 ## F4 — Reglas Completas e IA Mejorada
 
-- [ ] **F4.1** — Añadir evoluciones (Stage 1/2 con restricción de turno), retirada con pago de energía y cálculo completo de Debilidades (`x2`) y Resistencias (`-30`) en `game-engine`. | *Módulos/archivos:* `game-engine`. | *Hecho:* tests JUnit 5 cubren cadenas evolutivas, retirada y modificadores de tipo.
+- [x] **F4.1** — Añadir evoluciones (Stage 1/2 con restricción de turno), retirada con pago de energía y cálculo completo de Debilidades (`x2`) y Resistencias (`-30`) en `game-engine`. | *Módulos/archivos:* `game-engine`. | *Hecho:* tests JUnit 5 cubren cadenas evolutivas, retirada y modificadores de tipo.
 - [ ] **F4.2** — Implementar los 5 estados alterados (`POISONED`, `BURNED`, `ASLEEP`, `PARALYZED`, `CONFUSED`) con `RandomProvider` inyectable, `POKEMON_CHECKUP` y limpieza al evolucionar/retirar. | *Módulos/archivos:* `game-engine`. | *Hecho:* tests JUnit 5 deterministas validan cada estado y sus interacciones.
 - [ ] **F4.3** — Implementar `CardEffectRegistry` (Strategy/Registry por ID TCGdex) con bloques componibles (daño, robo, curación, estado, cambio, descarte energía) y efectos clave de Entrenadores y ataques de `base1`. | *Módulos/archivos:* `game-engine`. | *Hecho:* tests JUnit 5 validan efectos registrados sin condicionales monolíticos.
 - [ ] **F4.4** — Implementar `TacticalBotStrategy` (`BASIC`/`TACTICAL` en `bot-ai` y `match-api`) evaluando evoluciones, ventaja de tipo, retirada defensiva y uso de Entrenadores. | *Módulos/archivos:* `bot-ai`, `match-api`. | *Hecho:* simulación JUnit 5 Táctico vs. Básico valida legalidad y ventaja táctica.
@@ -79,3 +79,4 @@
 | 2026-11-23 | F3.3 | Implementada IA CPU en Java puro (`BotDifficulty`, `BotStrategy`, `BasicBotStrategy` leyendo solo `PlayerViewDTO` + `attack.canPay()`, y `BotTurnRunner` con guardia `MAX_ACTIONS_PER_TURN = 25`). Verificado: `mvn test` (`48/48`) en verde incluyendo `BotArchitectureTest`, `BasicBotStrategyTest` y `BotVsBotSimulationTest` (5 partidas completas de 60 cartas hasta `GAME_OVER`). | F3.4 |
 | 2026-11-23 | F3.4 | Creada migración `V4__matches_schema.sql`, `MatchEntity` (`state_json JSONB` + `@Version`), `CatalogCardMapper` (inferencia de energías `base1-96..102` y parseo de daño numérico), `MatchService`, `MatchController` (`/api/matches`, `/active`, `/{id}`, `/actions`, `/concede`), actualización de `UserStatsService` y mapeo `400`/`409` en `GlobalExceptionHandler`. Verificado: Flyway aplicó `V4` en PostgreSQL y `mvn test` (`53/53`) en verde incluyendo `GameStateJsonRoundTripTest`, `CatalogCardMapperTest`, `MatchControllerTest` y `MatchIntegrationTest`. | F3.5 |
 | 2026-11-23 | F3.5 | Implementado Setup (`/play/setup`), retomar partida activa en Home (`/`), Tablero `/play/:matchId` (`MatchSetupPageComponent`, `BattleBoardPageComponent`, `MatchStore`, `EventAnimatorService` sin simular estados intermedios, ataques regidos por `attack.canPay`, `HpBarComponent`, `DiscardPileModalComponent`, `EventLogFeedComponent`, `MatchResultModalComponent`). Corregido error `NG0600` y ajuste de `HpBar` tras E2E en navegador (`1366x864`). Verificado: `ng test` (`8/8` ChromeHeadless), `ng build` y flujo completo en vivo sin errores de consola/HTTP. **Fase F3 completada (100%).** | F4.1 |
+| 2026-11-23 | F4.1 | Añadidos `ModifierType`, `ActiveModifier` (con expiración `expiresAfterTurn` en fin de turno), `DamageCalculator` (Debilidad `×2`, Resistencia `-30`, `Harden`, `PlusPower`/`Defender`), `EvolveAction` (Stage 1/2 con restricción de turno y limpieza de estados/modificadores), `RetreatAction` (1/turno y pago de costo de retirada), y proyección autoritativa de `canRetreat`, `CardViewDTO.playable` y `validTargetIds`. Verificado: `mvn test` (`56/56`) en verde incluyendo `GameEngineEvolutionRetreatDamageTest`, `EngineArchitectureTest` y `MatchIntegrationTest`. | F4.2 |

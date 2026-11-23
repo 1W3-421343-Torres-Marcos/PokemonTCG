@@ -1,5 +1,6 @@
 package com.pokemontcg.engine;
 
+import com.pokemontcg.engine.model.ActiveModifier;
 import com.pokemontcg.engine.model.AttackDefinition;
 import com.pokemontcg.engine.model.CardDefinition;
 import com.pokemontcg.engine.model.CardInstance;
@@ -62,6 +63,7 @@ class EngineArchitectureTest {
                 GameState.class,
                 PlayerState.class,
                 PokemonInPlay.class,
+                ActiveModifier.class,
                 CardInstance.class,
                 CardDefinition.class,
                 AttackDefinition.class,

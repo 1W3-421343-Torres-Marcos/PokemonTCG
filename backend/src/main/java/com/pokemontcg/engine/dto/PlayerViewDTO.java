@@ -26,11 +26,40 @@ public record PlayerViewDTO(
         List<CardViewDTO> myDiscard,
         int myDeckCount,
         int myPrizesRemaining,
-        OpponentViewDTO opponent
+        OpponentViewDTO opponent,
+        boolean canRetreat
 ) {
     public PlayerViewDTO {
         myHand = myHand == null ? List.of() : List.copyOf(myHand);
         myBench = myBench == null ? List.of() : List.copyOf(myBench);
         myDiscard = myDiscard == null ? List.of() : List.copyOf(myDiscard);
+    }
+
+    public PlayerViewDTO(
+            PlayerId viewer,
+            int turnNumber,
+            PlayerId activePlayer,
+            PlayerId startingPlayer,
+            TurnPhase phase,
+            PlayerId awaitingPromotionPlayer,
+            boolean energyAttachedThisTurn,
+            boolean retreatedThisTurn,
+            boolean canAttackThisTurn,
+            boolean mySetupReady,
+            boolean opponentSetupReady,
+            PlayerId winner,
+            WinReason winReason,
+            List<CardViewDTO> myHand,
+            PokemonViewDTO myActive,
+            List<PokemonViewDTO> myBench,
+            List<CardViewDTO> myDiscard,
+            int myDeckCount,
+            int myPrizesRemaining,
+            OpponentViewDTO opponent
+    ) {
+        this(viewer, turnNumber, activePlayer, startingPlayer, phase, awaitingPromotionPlayer,
+                energyAttachedThisTurn, retreatedThisTurn, canAttackThisTurn, mySetupReady,
+                opponentSetupReady, winner, winReason, myHand, myActive, myBench, myDiscard,
+                myDeckCount, myPrizesRemaining, opponent, false);
     }
 }

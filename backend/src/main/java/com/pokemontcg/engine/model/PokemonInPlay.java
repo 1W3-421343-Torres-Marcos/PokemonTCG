@@ -13,7 +13,8 @@ public record PokemonInPlay(
         int damage,
         Set<StatusCondition> statusConditions,
         int turnEnteredPlay,
-        int turnLastEvolved
+        int turnLastEvolved,
+        List<ActiveModifier> modifiers
 ) {
     public PokemonInPlay {
         instanceId = Objects.requireNonNull(instanceId, "pokemon instanceId must not be null");
@@ -24,6 +25,20 @@ public record PokemonInPlay(
         attachedEnergies = attachedEnergies == null ? List.of() : List.copyOf(attachedEnergies);
         damage = Math.max(0, damage);
         statusConditions = statusConditions == null ? Set.of() : Set.copyOf(statusConditions);
+        modifiers = modifiers == null ? List.of() : List.copyOf(modifiers);
+    }
+
+    public PokemonInPlay(
+            String instanceId,
+            CardInstance activeCard,
+            List<CardInstance> evolutionChain,
+            List<CardInstance> attachedEnergies,
+            int damage,
+            Set<StatusCondition> statusConditions,
+            int turnEnteredPlay,
+            int turnLastEvolved
+    ) {
+        this(instanceId, activeCard, evolutionChain, attachedEnergies, damage, statusConditions, turnEnteredPlay, turnLastEvolved, List.of());
     }
 
     public static PokemonInPlay fromBasic(CardInstance basicCard, int turnNumber) {
@@ -35,7 +50,8 @@ public record PokemonInPlay(
                 0,
                 Set.of(),
                 turnNumber,
-                turnNumber
+                turnNumber,
+                List.of()
         );
     }
 
@@ -50,6 +66,41 @@ public record PokemonInPlay(
 
     public boolean knockedOut() {
         return maxHp() > 0 && damage >= maxHp();
+    }
+
+    public PokemonInPlay withDamage(int nextDamage) {
+        return new PokemonInPlay(
+                instanceId, activeCard, evolutionChain, attachedEnergies,
+                nextDamage, statusConditions, turnEnteredPlay, turnLastEvolved, modifiers
+        );
+    }
+
+    public PokemonInPlay withAttachedEnergies(List<CardInstance> nextEnergies) {
+        return new PokemonInPlay(
+                instanceId, activeCard, evolutionChain, nextEnergies,
+                damage, statusConditions, turnEnteredPlay, turnLastEvolved, modifiers
+        );
+    }
+
+    public PokemonInPlay withStatusConditions(Set<StatusCondition> nextStatuses) {
+        return new PokemonInPlay(
+                instanceId, activeCard, evolutionChain, attachedEnergies,
+                damage, nextStatuses, turnEnteredPlay, turnLastEvolved, modifiers
+        );
+    }
+
+    public PokemonInPlay withModifiers(List<ActiveModifier> nextModifiers) {
+        return new PokemonInPlay(
+                instanceId, activeCard, evolutionChain, attachedEnergies,
+                damage, statusConditions, turnEnteredPlay, turnLastEvolved, nextModifiers
+        );
+    }
+
+    public PokemonInPlay withClearedCombatState() {
+        return new PokemonInPlay(
+                instanceId, activeCard, evolutionChain, attachedEnergies,
+                damage, Set.of(), turnEnteredPlay, turnLastEvolved, List.of()
+        );
     }
 
     public List<CardInstance> allCards() {

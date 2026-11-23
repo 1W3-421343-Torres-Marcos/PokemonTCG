@@ -12,7 +12,8 @@ public record PlayerState(
         boolean energyAttachedThisTurn,
         boolean retreatedThisTurn,
         boolean setupReady,
-        int mulliganCount
+        int mulliganCount,
+        int plusPowerBonus
 ) {
     public PlayerState {
         deck = deck == null ? List.of() : List.copyOf(deck);
@@ -21,6 +22,23 @@ public record PlayerState(
         prizes = prizes == null ? List.of() : List.copyOf(prizes);
         discardPile = discardPile == null ? List.of() : List.copyOf(discardPile);
         mulliganCount = Math.max(0, mulliganCount);
+        plusPowerBonus = Math.max(0, plusPowerBonus);
+    }
+
+    public PlayerState(
+            List<CardInstance> deck,
+            List<CardInstance> hand,
+            PokemonInPlay active,
+            List<PokemonInPlay> bench,
+            List<CardInstance> prizes,
+            List<CardInstance> discardPile,
+            boolean energyAttachedThisTurn,
+            boolean retreatedThisTurn,
+            boolean setupReady,
+            int mulliganCount
+    ) {
+        this(deck, hand, active, bench, prizes, discardPile,
+                energyAttachedThisTurn, retreatedThisTurn, setupReady, mulliganCount, 0);
     }
 
     public static PlayerState initial(List<CardInstance> deck, List<CardInstance> hand, int mulliganCount) {
@@ -34,7 +52,8 @@ public record PlayerState(
                 false,
                 false,
                 false,
-                mulliganCount
+                mulliganCount,
+                0
         );
     }
 }

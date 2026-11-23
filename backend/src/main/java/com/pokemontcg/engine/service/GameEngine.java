@@ -14,6 +14,7 @@ import com.pokemontcg.engine.action.SelectSetupAction;
 import com.pokemontcg.engine.event.GameEvent;
 import com.pokemontcg.engine.event.GameEventType;
 import com.pokemontcg.engine.exception.IllegalGameActionException;
+import com.pokemontcg.engine.model.ActiveModifier;
 import com.pokemontcg.engine.model.AttackDefinition;
 import com.pokemontcg.engine.model.CardDefinition;
 import com.pokemontcg.engine.model.CardInstance;
@@ -21,12 +22,15 @@ import com.pokemontcg.engine.model.GameState;
 import com.pokemontcg.engine.model.PlayerId;
 import com.pokemontcg.engine.model.PlayerState;
 import com.pokemontcg.engine.model.PokemonInPlay;
+import com.pokemontcg.engine.model.StatusCondition;
 import com.pokemontcg.engine.model.TurnPhase;
 import com.pokemontcg.engine.model.WinReason;
 import com.pokemontcg.engine.random.RandomProvider;
+import com.pokemontcg.engine.rules.DamageCalculator;
 import com.pokemontcg.engine.rules.EnergyCostMatcher;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
@@ -132,12 +136,10 @@ public class GameEngine {
             case EndTurnAction ignored -> handleEndTurn(state, actor, events);
             case PromoteActiveAction ignored ->
                     throw new IllegalGameActionException("No hay ninguna promoción pendiente en este momento");
-            case EvolveAction ignored ->
-                    throw new IllegalGameActionException("Acción disponible a partir de la Fase 4");
+            case EvolveAction evolve -> handleEvolve(state, actor, evolve, events);
             case PlayTrainerAction ignored ->
-                    throw new IllegalGameActionException("Acción disponible a partir de la Fase 4");
-            case RetreatAction ignored ->
-                    throw new IllegalGameActionException("Acción disponible a partir de la Fase 4");
+                    throw new IllegalGameActionException("Acción de Entrenador disponible en F4.3");
+            case RetreatAction retreat -> handleRetreat(state, actor, retreat, events);
             case ConcedeAction ignored -> throw new IllegalStateException("Handled earlier");
         };
     }
@@ -281,7 +283,8 @@ public class GameEngine {
                 actorState.energyAttachedThisTurn(),
                 actorState.retreatedThisTurn(),
                 actorState.setupReady(),
-                actorState.mulliganCount()
+                actorState.mulliganCount(),
+                actorState.plusPowerBonus()
         );
 
         events.emit(
@@ -347,7 +350,8 @@ public class GameEngine {
                 true,
                 actorState.retreatedThisTurn(),
                 actorState.setupReady(),
-                actorState.mulliganCount()
+                actorState.mulliganCount(),
+                actorState.plusPowerBonus()
         );
 
         events.emit(
@@ -402,17 +406,13 @@ public class GameEngine {
                 Map.of("attackName", chosenAttack.name(), "attackerName", attacker.activeCard().definition().name())
         );
 
-        int damageDealt = chosenAttack.baseDamage();
-        PokemonInPlay damagedDefender = new PokemonInPlay(
-                defender.instanceId(),
-                defender.activeCard(),
-                defender.evolutionChain(),
-                defender.attachedEnergies(),
-                defender.damage() + damageDealt,
-                defender.statusConditions(),
-                defender.turnEnteredPlay(),
-                defender.turnLastEvolved()
+        int damageDealt = DamageCalculator.calculateDamage(
+                attacker,
+                defender,
+                chosenAttack.baseDamage(),
+                attackerState.plusPowerBonus()
         );
+        PokemonInPlay damagedDefender = defender.withDamage(defender.damage() + damageDealt);
 
         events.emit(
                 GameEventType.DAMAGE_DEALT,
@@ -575,9 +575,264 @@ public class GameEngine {
         return new EngineStepResult(nextTurnState, events.events());
     }
 
+    private EngineStepResult handleEvolve(
+            GameState state,
+            PlayerId actor,
+            EvolveAction action,
+            EventCollector events
+    ) {
+        requireMainPhaseAndTurn(state, actor);
+        if (state.turnNumber() <= 2) {
+            throw new IllegalGameActionException("No se puede evolucionar en el primer turno de ningún jugador");
+        }
+        if (action.evolutionCardInstanceId() == null || action.evolutionCardInstanceId().isBlank()
+                || action.targetPokemonInstanceId() == null || action.targetPokemonInstanceId().isBlank()) {
+            throw new IllegalGameActionException("Debes indicar carta de evolución y Pokémon objetivo");
+        }
+
+        PlayerState actorState = state.player(actor);
+        List<CardInstance> nextHand = new ArrayList<>(actorState.hand());
+        CardInstance evoCard = removeHandCard(
+                nextHand, action.evolutionCardInstanceId(), "La carta de evolución no está en tu mano"
+        );
+        if (!evoCard.definition().evolutionCard()) {
+            throw new IllegalGameActionException("La carta seleccionada no es una Evolución (Stage 1 / Stage 2)");
+        }
+        String requiredPreEvo = evoCard.definition().evolveFrom();
+        if (requiredPreEvo == null || requiredPreEvo.isBlank()) {
+            throw new IllegalGameActionException("La carta de evolución no especifica preevolución");
+        }
+
+        PokemonInPlay nextActive = actorState.active();
+        List<PokemonInPlay> nextBench = new ArrayList<>(actorState.bench());
+        String preName;
+
+        if (nextActive != null && nextActive.instanceId().equals(action.targetPokemonInstanceId())) {
+            validateEvolutionTarget(nextActive, requiredPreEvo, state.turnNumber());
+            preName = nextActive.activeCard().definition().name();
+            nextActive = buildEvolvedPokemon(nextActive, evoCard, state.turnNumber());
+        } else {
+            int benchIndex = -1;
+            for (int i = 0; i < nextBench.size(); i++) {
+                if (nextBench.get(i).instanceId().equals(action.targetPokemonInstanceId())) {
+                    benchIndex = i;
+                    break;
+                }
+            }
+            if (benchIndex < 0) {
+                throw new IllegalGameActionException("El Pokémon objetivo para evolucionar no está en juego");
+            }
+            PokemonInPlay target = nextBench.get(benchIndex);
+            validateEvolutionTarget(target, requiredPreEvo, state.turnNumber());
+            preName = target.activeCard().definition().name();
+            nextBench.set(benchIndex, buildEvolvedPokemon(target, evoCard, state.turnNumber()));
+        }
+
+        PlayerState updatedPlayer = new PlayerState(
+                actorState.deck(),
+                nextHand,
+                nextActive,
+                nextBench,
+                actorState.prizes(),
+                actorState.discardPile(),
+                actorState.energyAttachedThisTurn(),
+                actorState.retreatedThisTurn(),
+                actorState.setupReady(),
+                actorState.mulliganCount(),
+                actorState.plusPowerBonus()
+        );
+
+        events.emit(
+                GameEventType.POKEMON_EVOLVED,
+                actor,
+                displayPlayer(actor) + " evolucionó a " + preName + " en " + evoCard.definition().name() + ".",
+                Map.of("fromName", preName, "toName", evoCard.definition().name())
+        );
+
+        GameState nextState = withSequence(state.withPlayer(actor, updatedPlayer), events.nextSequence());
+        return new EngineStepResult(nextState, events.events());
+    }
+
+    private void validateEvolutionTarget(PokemonInPlay target, String requiredPreEvo, int currentTurn) {
+        if (!target.activeCard().definition().name().equalsIgnoreCase(requiredPreEvo)) {
+            throw new IllegalGameActionException(
+                    target.activeCard().definition().name() + " no puede evolucionar desde " + requiredPreEvo
+            );
+        }
+        if (target.turnEnteredPlay() >= currentTurn || target.turnLastEvolved() >= currentTurn) {
+            throw new IllegalGameActionException(
+                    "No puedes evolucionar un Pokémon en el mismo turno en que entró en juego o evolucionó"
+            );
+        }
+    }
+
+    private PokemonInPlay buildEvolvedPokemon(PokemonInPlay target, CardInstance evoCard, int currentTurn) {
+        List<CardInstance> nextChain = new ArrayList<>(target.evolutionChain());
+        nextChain.add(evoCard);
+        return new PokemonInPlay(
+                target.instanceId(),
+                evoCard,
+                nextChain,
+                target.attachedEnergies(),
+                target.damage(),
+                Set.of(),
+                target.turnEnteredPlay(),
+                currentTurn,
+                List.of()
+        );
+    }
+
+    private EngineStepResult handleRetreat(
+            GameState state,
+            PlayerId actor,
+            RetreatAction action,
+            EventCollector events
+    ) {
+        requireMainPhaseAndTurn(state, actor);
+        PlayerState actorState = state.player(actor);
+        if (actorState.retreatedThisTurn()) {
+            throw new IllegalGameActionException("Solo puedes retirarte una vez por turno");
+        }
+        PokemonInPlay currentActive = actorState.active();
+        if (currentActive == null) {
+            throw new IllegalGameActionException("No tienes ningún Pokémon Activo para retirar");
+        }
+        if (actorState.bench().isEmpty()) {
+            throw new IllegalGameActionException("No tienes Pokémon en Banca para relevar al Activo");
+        }
+        if (currentActive.statusConditions().contains(StatusCondition.ASLEEP)
+                || currentActive.statusConditions().contains(StatusCondition.PARALYZED)) {
+            throw new IllegalGameActionException("No puedes retirar un Pokémon Dormido o Paralizado");
+        }
+        if (action.benchInstanceId() == null || action.benchInstanceId().isBlank()) {
+            throw new IllegalGameActionException("Debes seleccionar un Pokémon de la Banca como relevo");
+        }
+
+        List<PokemonInPlay> nextBench = new ArrayList<>(actorState.bench());
+        int benchIndex = -1;
+        for (int i = 0; i < nextBench.size(); i++) {
+            if (nextBench.get(i).instanceId().equals(action.benchInstanceId())) {
+                benchIndex = i;
+                break;
+            }
+        }
+        if (benchIndex < 0) {
+            throw new IllegalGameActionException("El Pokémon elegido no se encuentra en tu Banca");
+        }
+
+        int retreatCost = currentActive.activeCard().definition().retreatCost();
+        RetreatPayment payment = payRetreatCost(
+                currentActive.attachedEnergies(), retreatCost, action.discardEnergyInstanceIds()
+        );
+
+        PokemonInPlay retreatedToBench = currentActive
+                .withAttachedEnergies(payment.remaining())
+                .withClearedCombatState();
+        PokemonInPlay promotedActive = nextBench.get(benchIndex);
+        nextBench.set(benchIndex, retreatedToBench);
+
+        List<CardInstance> nextDiscard = new ArrayList<>(actorState.discardPile());
+        nextDiscard.addAll(payment.paid());
+
+        PlayerState updatedPlayer = new PlayerState(
+                actorState.deck(),
+                actorState.hand(),
+                promotedActive,
+                nextBench,
+                actorState.prizes(),
+                nextDiscard,
+                actorState.energyAttachedThisTurn(),
+                true,
+                actorState.setupReady(),
+                actorState.mulliganCount(),
+                actorState.plusPowerBonus()
+        );
+
+        events.emit(
+                GameEventType.POKEMON_RETREATED,
+                actor,
+                displayPlayer(actor) + " retiró a " + currentActive.activeCard().definition().name()
+                        + " por " + promotedActive.activeCard().definition().name() + ".",
+                Map.of(
+                        "retreatedName", currentActive.activeCard().definition().name(),
+                        "promotedName", promotedActive.activeCard().definition().name(),
+                        "energiesDiscarded", payment.paid().size()
+                )
+        );
+
+        GameState nextState = withSequence(state.withPlayer(actor, updatedPlayer), events.nextSequence());
+        return new EngineStepResult(nextState, events.events());
+    }
+
+    private RetreatPayment payRetreatCost(
+            List<CardInstance> attachedEnergies,
+            int retreatCost,
+            List<String> requestedIds
+    ) {
+        if (retreatCost <= 0) {
+            return new RetreatPayment(List.of(), attachedEnergies);
+        }
+
+        List<CardInstance> remaining = new ArrayList<>(attachedEnergies);
+        List<CardInstance> paid = new ArrayList<>();
+        int paidUnits = 0;
+
+        if (requestedIds != null && !requestedIds.isEmpty()) {
+            Set<String> seen = new HashSet<>();
+            for (String reqId : requestedIds) {
+                if (!seen.add(reqId)) {
+                    throw new IllegalGameActionException("Energía duplicada en pago de retirada");
+                }
+                int idx = -1;
+                for (int i = 0; i < remaining.size(); i++) {
+                    if (remaining.get(i).instanceId().equals(reqId)) {
+                        idx = i;
+                        break;
+                    }
+                }
+                if (idx < 0) {
+                    throw new IllegalGameActionException("Energía de retirada no está adherida al Pokémon Activo");
+                }
+                CardInstance removed = remaining.remove(idx);
+                paid.add(removed);
+                paidUnits += Math.max(1, removed.definition().providedEnergyCount());
+            }
+            if (paidUnits < retreatCost) {
+                throw new IllegalGameActionException("Las energías seleccionadas no cubren el costo de retirada (" + retreatCost + ")");
+            }
+            return new RetreatPayment(paid, remaining);
+        }
+
+        int totalAvailable = 0;
+        for (CardInstance energy : attachedEnergies) {
+            totalAvailable += Math.max(1, energy.definition().providedEnergyCount());
+        }
+        if (totalAvailable < retreatCost) {
+            throw new IllegalGameActionException("Energía insuficiente para retirarse (costo: " + retreatCost + ")");
+        }
+
+        List<CardInstance> orderedCandidates = new ArrayList<>(attachedEnergies);
+        orderedCandidates.sort(Comparator.comparingInt(c -> Math.max(1, c.definition().providedEnergyCount())));
+        Set<String> chosenIds = new HashSet<>();
+        for (CardInstance candidate : orderedCandidates) {
+            if (paidUnits >= retreatCost) {
+                break;
+            }
+            chosenIds.add(candidate.instanceId());
+            paid.add(candidate);
+            paidUnits += Math.max(1, candidate.definition().providedEnergyCount());
+        }
+        remaining.removeIf(card -> chosenIds.contains(card.instanceId()));
+        return new RetreatPayment(paid, remaining);
+    }
+
+    private record RetreatPayment(List<CardInstance> paid, List<CardInstance> remaining) {
+    }
+
     private GameState advanceToNextTurn(GameState state, PlayerId endingPlayer, EventCollector events) {
-        PlayerState resetEnding = resetTurnFlags(state.player(endingPlayer));
-        GameState afterReset = state.withPlayer(endingPlayer, resetEnding);
+        GameState cleaned = purgeExpiredModifiers(state, state.turnNumber());
+        PlayerState resetEnding = resetTurnFlags(cleaned.player(endingPlayer));
+        GameState afterReset = cleaned.withPlayer(endingPlayer, resetEnding);
 
         events.emit(
                 GameEventType.TURN_ENDED,
@@ -587,6 +842,35 @@ public class GameEngine {
         );
 
         return startTurn(afterReset, endingPlayer.opponent(), state.turnNumber() + 1, events);
+    }
+
+    private GameState purgeExpiredModifiers(GameState state, int currentTurn) {
+        GameState updated = state;
+        for (PlayerId pid : List.of(PlayerId.PLAYER, PlayerId.CPU)) {
+            PlayerState ps = updated.player(pid);
+            PokemonInPlay nextActive = purgePokemonModifiers(ps.active(), currentTurn);
+            List<PokemonInPlay> nextBench = ps.bench().stream()
+                    .map(p -> purgePokemonModifiers(p, currentTurn))
+                    .toList();
+            updated = updated.withPlayer(pid, new PlayerState(
+                    ps.deck(), ps.hand(), nextActive, nextBench, ps.prizes(), ps.discardPile(),
+                    ps.energyAttachedThisTurn(), ps.retreatedThisTurn(), ps.setupReady(),
+                    ps.mulliganCount(), ps.plusPowerBonus()
+            ));
+        }
+        return updated;
+    }
+
+    private PokemonInPlay purgePokemonModifiers(PokemonInPlay pokemon, int currentTurn) {
+        if (pokemon == null || pokemon.modifiers().isEmpty()) {
+            return pokemon;
+        }
+        List<ActiveModifier> surviving = pokemon.modifiers().stream()
+                .filter(m -> m.expiresAfterTurn() > currentTurn)
+                .toList();
+        return surviving.size() == pokemon.modifiers().size()
+                ? pokemon
+                : pokemon.withModifiers(surviving);
     }
 
     private GameState startTurn(GameState state, PlayerId nextPlayer, int nextTurnNumber, EventCollector events) {
@@ -820,16 +1104,7 @@ public class GameEngine {
     private PokemonInPlay attachEnergyToPokemon(PokemonInPlay target, CardInstance energyCard) {
         List<CardInstance> nextEnergies = new ArrayList<>(target.attachedEnergies());
         nextEnergies.add(energyCard);
-        return new PokemonInPlay(
-                target.instanceId(),
-                target.activeCard(),
-                target.evolutionChain(),
-                nextEnergies,
-                target.damage(),
-                target.statusConditions(),
-                target.turnEnteredPlay(),
-                target.turnLastEvolved()
-        );
+        return target.withAttachedEnergies(nextEnergies);
     }
 
     private PlayerState replaceActive(PlayerState state, PokemonInPlay active) {
@@ -843,7 +1118,8 @@ public class GameEngine {
                 state.energyAttachedThisTurn(),
                 state.retreatedThisTurn(),
                 state.setupReady(),
-                state.mulliganCount()
+                state.mulliganCount(),
+                state.plusPowerBonus()
         );
     }
 
@@ -858,7 +1134,8 @@ public class GameEngine {
                 false,
                 false,
                 state.setupReady(),
-                state.mulliganCount()
+                state.mulliganCount(),
+                0
         );
     }
 

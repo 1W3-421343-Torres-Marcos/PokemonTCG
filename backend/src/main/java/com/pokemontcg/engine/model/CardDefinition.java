@@ -42,6 +42,18 @@ public record CardDefinition(
         return pokemonCard() && "Basic".equalsIgnoreCase(stage);
     }
 
+    public boolean evolutionCard() {
+        if (!pokemonCard() || stage == null) {
+            return false;
+        }
+        String normalized = stage.replace(" ", "");
+        return "Stage1".equalsIgnoreCase(normalized) || "Stage2".equalsIgnoreCase(normalized);
+    }
+
+    public String primaryType() {
+        return types.isEmpty() ? "Colorless" : types.get(0);
+    }
+
     public boolean energyCard() {
         return "Energy".equalsIgnoreCase(category);
     }

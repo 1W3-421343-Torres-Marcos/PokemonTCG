@@ -29,11 +29,26 @@ public final class PlayerViewProjector {
         PlayerState myState = state.player(viewer);
         PlayerState opponentState = state.player(opponentId);
 
+        boolean activeImmobilized = myState.active() != null && (
+                myState.active().statusConditions().contains(StatusCondition.ASLEEP)
+                        || myState.active().statusConditions().contains(StatusCondition.PARALYZED)
+        );
+
         boolean canAttackThisTurn = state.phase() == TurnPhase.MAIN_PHASE
                 && state.activePlayer() == viewer
                 && state.awaitingPromotionPlayer() == null
                 && state.turnNumber() > 1
-                && myState.active() != null;
+                && myState.active() != null
+                && !activeImmobilized;
+
+        boolean canRetreat = state.phase() == TurnPhase.MAIN_PHASE
+                && state.activePlayer() == viewer
+                && state.awaitingPromotionPlayer() == null
+                && myState.active() != null
+                && !myState.retreatedThisTurn()
+                && !myState.bench().isEmpty()
+                && !activeImmobilized
+                && totalEnergyUnits(myState.active()) >= myState.active().activeCard().definition().retreatCost();
 
         OpponentViewDTO opponentView = new OpponentViewDTO(
                 opponentId,
@@ -42,8 +57,12 @@ public final class PlayerViewProjector {
                 opponentState.prizes().size(),
                 projectPokemon(opponentState.active()),
                 opponentState.bench().stream().map(PlayerViewProjector::projectPokemon).toList(),
-                opponentState.discardPile().stream().map(c -> toCardView(c, List.of())).toList()
+                opponentState.discardPile().stream().map(c -> toCardView(c, List.of(), false, List.of())).toList()
         );
+
+        List<CardViewDTO> myHandViews = myState.hand().stream()
+                .map(card -> toHandCardView(state, viewer, myState, card))
+                .toList();
 
         return new PlayerViewDTO(
                 viewer,
@@ -59,13 +78,14 @@ public final class PlayerViewProjector {
                 opponentState.setupReady(),
                 state.winner(),
                 state.winReason(),
-                myState.hand().stream().map(c -> toCardView(c, List.of())).toList(),
+                myHandViews,
                 projectPokemon(myState.active()),
                 myState.bench().stream().map(PlayerViewProjector::projectPokemon).toList(),
-                myState.discardPile().stream().map(c -> toCardView(c, List.of())).toList(),
+                myState.discardPile().stream().map(c -> toCardView(c, List.of(), false, List.of())).toList(),
                 myState.deck().size(),
                 myState.prizes().size(),
-                opponentView
+                opponentView,
+                canRetreat
         );
     }
 
@@ -74,7 +94,7 @@ public final class PlayerViewProjector {
             return null;
         }
         List<CardInstance> energies = pokemon.attachedEnergies();
-        CardViewDTO activeCard = toCardView(pokemon.activeCard(), energies);
+        CardViewDTO activeCard = toCardView(pokemon.activeCard(), energies, false, List.of());
         List<StatusCondition> conditions = pokemon.statusConditions().stream()
                 .sorted(Comparator.comparing(Enum::name))
                 .toList();
@@ -84,7 +104,7 @@ public final class PlayerViewProjector {
                 pokemon.maxHp(),
                 pokemon.remainingHp(),
                 pokemon.damage(),
-                energies.stream().map(e -> toCardView(e, List.of())).toList(),
+                energies.stream().map(e -> toCardView(e, List.of(), false, List.of())).toList(),
                 conditions,
                 activeCard.attacks(),
                 pokemon.turnEnteredPlay(),
@@ -92,7 +112,66 @@ public final class PlayerViewProjector {
         );
     }
 
-    private static CardViewDTO toCardView(CardInstance card, List<CardInstance> attachedEnergies) {
+    private static CardViewDTO toHandCardView(GameState state, PlayerId viewer, PlayerState myState, CardInstance card) {
+        CardDefinition def = card.definition();
+        boolean playable = false;
+        List<String> validTargets = List.of();
+
+        if (state.phase() == TurnPhase.SETUP && !myState.setupReady()) {
+            playable = def.basicPokemon();
+        } else if (state.phase() == TurnPhase.MAIN_PHASE
+                && state.activePlayer() == viewer
+                && state.awaitingPromotionPlayer() == null) {
+            if (def.basicPokemon()) {
+                playable = myState.bench().size() < 5;
+            } else if (def.energyCard()) {
+                if (!myState.energyAttachedThisTurn()) {
+                    validTargets = ownPokemonInPlayIds(myState);
+                    playable = !validTargets.isEmpty();
+                }
+            } else if (def.evolutionCard()) {
+                if (state.turnNumber() > 2 && def.evolveFrom() != null && !def.evolveFrom().isBlank()) {
+                    validTargets = ownPokemonInPlay(myState).stream()
+                            .filter(p -> p.activeCard().definition().name().equalsIgnoreCase(def.evolveFrom()))
+                            .filter(p -> p.turnEnteredPlay() < state.turnNumber() && p.turnLastEvolved() < state.turnNumber())
+                            .map(PokemonInPlay::instanceId)
+                            .toList();
+                    playable = !validTargets.isEmpty();
+                }
+            }
+        }
+
+        return toCardView(card, List.of(), playable, validTargets);
+    }
+
+    private static List<PokemonInPlay> ownPokemonInPlay(PlayerState myState) {
+        List<PokemonInPlay> inPlay = new ArrayList<>();
+        if (myState.active() != null) {
+            inPlay.add(myState.active());
+        }
+        inPlay.addAll(myState.bench());
+        return inPlay;
+    }
+
+    private static List<String> ownPokemonInPlayIds(PlayerState myState) {
+        return ownPokemonInPlay(myState).stream().map(PokemonInPlay::instanceId).toList();
+    }
+
+    private static int totalEnergyUnits(PokemonInPlay pokemon) {
+        int total = 0;
+        for (CardInstance energy : pokemon.attachedEnergies()) {
+            int units = energy.definition().providedEnergyCount();
+            total += units > 0 ? units : 1;
+        }
+        return total;
+    }
+
+    private static CardViewDTO toCardView(
+            CardInstance card,
+            List<CardInstance> attachedEnergies,
+            boolean playable,
+            List<String> validTargetIds
+    ) {
         CardDefinition def = card.definition();
         List<AttackViewDTO> attackViews = new ArrayList<>(def.attacks().size());
         for (int i = 0; i < def.attacks().size(); i++) {
@@ -127,7 +206,9 @@ public final class PlayerViewProjector {
                 def.providedEnergyType(),
                 def.providedEnergyCount(),
                 def.imageLowUrl(),
-                def.imageHighUrl()
+                def.imageHighUrl(),
+                playable,
+                validTargetIds
         );
     }
 }
