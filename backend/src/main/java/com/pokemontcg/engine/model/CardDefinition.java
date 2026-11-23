@@ -57,4 +57,13 @@ public record CardDefinition(
     public boolean energyCard() {
         return "Energy".equalsIgnoreCase(category);
     }
+
+    public boolean trainerCard() {
+        return "Trainer".equalsIgnoreCase(category);
+    }
+
+    public boolean basicEnergy() {
+        return energyCard()
+                && ("Basic".equalsIgnoreCase(energyType) || "Normal".equalsIgnoreCase(energyType));
+    }
 }

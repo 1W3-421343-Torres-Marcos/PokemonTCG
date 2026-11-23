@@ -1,5 +1,7 @@
 package com.pokemontcg.engine.dto;
 
+import com.pokemontcg.engine.effects.CardEffectRegistry;
+import com.pokemontcg.engine.effects.TrainerEffect;
 import com.pokemontcg.engine.model.AttackDefinition;
 import com.pokemontcg.engine.model.CardDefinition;
 import com.pokemontcg.engine.model.CardInstance;
@@ -22,8 +24,13 @@ public final class PlayerViewProjector {
     }
 
     public static PlayerViewDTO project(GameState state, PlayerId viewer) {
+        return project(state, viewer, CardEffectRegistry.defaultRegistry());
+    }
+
+    public static PlayerViewDTO project(GameState state, PlayerId viewer, CardEffectRegistry registry) {
         Objects.requireNonNull(state, "state must not be null");
         Objects.requireNonNull(viewer, "viewer must not be null");
+        Objects.requireNonNull(registry, "registry must not be null");
 
         PlayerId opponentId = viewer.opponent();
         PlayerState myState = state.player(viewer);
@@ -61,7 +68,7 @@ public final class PlayerViewProjector {
         );
 
         List<CardViewDTO> myHandViews = myState.hand().stream()
-                .map(card -> toHandCardView(state, viewer, myState, card))
+                .map(card -> toHandCardView(state, viewer, myState, card, registry))
                 .toList();
 
         return new PlayerViewDTO(
@@ -112,7 +119,13 @@ public final class PlayerViewProjector {
         );
     }
 
-    private static CardViewDTO toHandCardView(GameState state, PlayerId viewer, PlayerState myState, CardInstance card) {
+    private static CardViewDTO toHandCardView(
+            GameState state,
+            PlayerId viewer,
+            PlayerState myState,
+            CardInstance card,
+            CardEffectRegistry registry
+    ) {
         CardDefinition def = card.definition();
         boolean playable = false;
         List<String> validTargets = List.of();
@@ -137,6 +150,12 @@ public final class PlayerViewProjector {
                             .map(PokemonInPlay::instanceId)
                             .toList();
                     playable = !validTargets.isEmpty();
+                }
+            } else if (def.trainerCard()) {
+                TrainerEffect trainerEffect = registry.findTrainer(def.id()).orElse(null);
+                if (trainerEffect != null && trainerEffect.canPlay(state, viewer, card)) {
+                    validTargets = trainerEffect.validTargetIds(state, viewer, card);
+                    playable = true;
                 }
             }
         }

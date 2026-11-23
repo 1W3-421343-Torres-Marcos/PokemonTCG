@@ -11,6 +11,11 @@ import com.pokemontcg.engine.action.PlayTrainerAction;
 import com.pokemontcg.engine.action.PromoteActiveAction;
 import com.pokemontcg.engine.action.RetreatAction;
 import com.pokemontcg.engine.action.SelectSetupAction;
+import com.pokemontcg.engine.effects.AttackContext;
+import com.pokemontcg.engine.effects.AttackEffect;
+import com.pokemontcg.engine.effects.CardEffectRegistry;
+import com.pokemontcg.engine.effects.EffectContext;
+import com.pokemontcg.engine.effects.TrainerEffect;
 import com.pokemontcg.engine.event.GameEvent;
 import com.pokemontcg.engine.event.GameEventType;
 import com.pokemontcg.engine.exception.IllegalGameActionException;
@@ -27,7 +32,6 @@ import com.pokemontcg.engine.model.TurnPhase;
 import com.pokemontcg.engine.model.WinReason;
 import com.pokemontcg.engine.random.DefaultRandomProvider;
 import com.pokemontcg.engine.random.RandomProvider;
-import com.pokemontcg.engine.rules.DamageCalculator;
 import com.pokemontcg.engine.rules.EnergyCostMatcher;
 import com.pokemontcg.engine.rules.StatusRules;
 
@@ -49,13 +53,19 @@ public class GameEngine {
     private static final int MAX_MULLIGANS = 50;
 
     private final RandomProvider randomProvider;
+    private final CardEffectRegistry cardEffectRegistry;
 
     public GameEngine() {
-        this(new DefaultRandomProvider());
+        this(new DefaultRandomProvider(), CardEffectRegistry.defaultRegistry());
     }
 
     public GameEngine(RandomProvider randomProvider) {
+        this(randomProvider, CardEffectRegistry.defaultRegistry());
+    }
+
+    public GameEngine(RandomProvider randomProvider, CardEffectRegistry cardEffectRegistry) {
         this.randomProvider = Objects.requireNonNull(randomProvider, "randomProvider must not be null");
+        this.cardEffectRegistry = Objects.requireNonNull(cardEffectRegistry, "cardEffectRegistry must not be null");
     }
 
     public EngineStepResult initializeMatch(
@@ -149,8 +159,7 @@ public class GameEngine {
             case PromoteActiveAction ignored ->
                     throw new IllegalGameActionException("No hay ninguna promoción pendiente en este momento");
             case EvolveAction evolve -> handleEvolve(state, actor, evolve, events);
-            case PlayTrainerAction ignored ->
-                    throw new IllegalGameActionException("Acción de Entrenador disponible en F4.3");
+            case PlayTrainerAction playTrainer -> handlePlayTrainer(state, actor, playTrainer, events);
             case RetreatAction retreat -> handleRetreat(state, actor, retreat, events);
             case ConcedeAction ignored -> throw new IllegalStateException("Handled earlier");
         };
@@ -450,29 +459,94 @@ public class GameEngine {
                 Map.of("attackName", chosenAttack.name(), "attackerName", attacker.activeCard().definition().name())
         );
 
-        int damageDealt = DamageCalculator.calculateDamage(
-                attacker,
-                defender,
-                chosenAttack.baseDamage(),
-                attackerState.plusPowerBonus()
-        );
-        PokemonInPlay damagedDefender = defender.withDamage(defender.damage() + damageDealt);
+        boolean defenderInitiallyImmune = AttackContext.hasImmuneModifier(defender);
+        AttackEffect attackEffect = cardEffectRegistry
+                .findAttack(attacker.activeCard().definition().id(), action.attackIndex())
+                .orElse(AttackEffect.DEFAULT_DAMAGE);
+        EffectContext effectContext = new EffectContext(state, actor, randomProvider, events::emit);
+        AttackContext attackContext = new AttackContext(effectContext, chosenAttack, defenderInitiallyImmune);
+        attackEffect.apply(attackContext);
 
+        return resolveKnockOutsAndProceed(effectContext.state(), actor, TurnPhase.ATTACK_PHASE, events);
+    }
+
+    private EngineStepResult handlePlayTrainer(
+            GameState state,
+            PlayerId actor,
+            PlayTrainerAction action,
+            EventCollector events
+    ) {
+        requireMainPhaseAndTurn(state, actor);
+        if (action.trainerCardInstanceId() == null || action.trainerCardInstanceId().isBlank()) {
+            throw new IllegalGameActionException("Debes indicar qué carta de Entrenador quieres jugar");
+        }
+
+        PlayerState actorState = state.player(actor);
+        CardInstance trainerCard = actorState.hand().stream()
+                .filter(c -> c.instanceId().equals(action.trainerCardInstanceId()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalGameActionException("La carta de Entrenador no se encuentra en tu mano"));
+        if (!trainerCard.definition().trainerCard()) {
+            throw new IllegalGameActionException("La carta seleccionada no es una carta de Entrenador");
+        }
+
+        TrainerEffect effect = cardEffectRegistry.findTrainer(trainerCard.definition().id())
+                .orElseThrow(() -> new IllegalGameActionException(
+                        "Efecto de Entrenador no soportado: " + trainerCard.definition().name()
+                ));
+        if (!effect.canPlay(state, actor, trainerCard)) {
+            throw new IllegalGameActionException(
+                    "No se cumplen las condiciones para jugar " + trainerCard.definition().name()
+            );
+        }
+
+        List<String> validTargets = effect.validTargetIds(state, actor, trainerCard);
+        if (!validTargets.isEmpty()) {
+            String targetId = action.targetPokemonInstanceId();
+            if (targetId == null || targetId.isBlank() || !validTargets.contains(targetId)) {
+                throw new IllegalGameActionException(
+                        "Debes elegir un objetivo válido para " + trainerCard.definition().name()
+                );
+            }
+        }
+
+        List<CardInstance> nextHand = new ArrayList<>(actorState.hand());
+        removeHandCard(nextHand, trainerCard.instanceId(), "La carta de Entrenador no se encuentra en tu mano");
+        List<CardInstance> nextDiscard = new ArrayList<>(actorState.discardPile());
+        nextDiscard.add(trainerCard);
+
+        PlayerState updatedActor = new PlayerState(
+                actorState.deck(),
+                nextHand,
+                actorState.active(),
+                actorState.bench(),
+                actorState.prizes(),
+                nextDiscard,
+                actorState.energyAttachedThisTurn(),
+                actorState.retreatedThisTurn(),
+                actorState.setupReady(),
+                actorState.mulliganCount(),
+                actorState.plusPowerBonus()
+        );
+        GameState stateAfterDiscard = state.withPlayer(actor, updatedActor);
+
+        String targetMeta = action.targetPokemonInstanceId() == null ? "" : action.targetPokemonInstanceId();
         events.emit(
-                GameEventType.DAMAGE_DEALT,
+                GameEventType.TRAINER_PLAYED,
                 actor,
-                damagedDefender.activeCard().definition().name() + " recibió " + damageDealt + " de daño ("
-                        + damagedDefender.remainingHp() + "/" + damagedDefender.maxHp() + " PS).",
+                displayPlayer(actor) + " jugó " + trainerCard.definition().name() + ".",
                 Map.of(
-                        "targetName", damagedDefender.activeCard().definition().name(),
-                        "damage", damageDealt,
-                        "remainingHp", damagedDefender.remainingHp(),
-                        "maxHp", damagedDefender.maxHp()
+                        "cardId", trainerCard.definition().id(),
+                        "cardName", trainerCard.definition().name(),
+                        "targetId", targetMeta
                 )
         );
 
-        GameState afterAttack = state.withPlayer(defenderId, replaceActive(defenderState, damagedDefender));
-        return resolveKnockOutsAndProceed(afterAttack, actor, TurnPhase.ATTACK_PHASE, events);
+        EffectContext effectContext = new EffectContext(stateAfterDiscard, actor, randomProvider, events::emit);
+        effect.execute(effectContext, trainerCard, action.targetPokemonInstanceId());
+
+        GameState finalState = withSequence(effectContext.state(), events.nextSequence());
+        return new EngineStepResult(finalState, events.events());
     }
 
     private EngineStepResult handlePromoteActive(
