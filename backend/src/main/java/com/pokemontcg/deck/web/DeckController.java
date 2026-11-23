@@ -36,6 +36,19 @@ public class DeckController {
         return deckService.listMyDecks(user.userId());
     }
 
+    @GetMapping("/starters")
+    public List<DeckSummaryDTO> listStarterDecks() {
+        return deckService.listStarterDecks();
+    }
+
+    @PostMapping("/starters/{id}/clone")
+    public ResponseEntity<DeckDetailDTO> cloneStarterDeck(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(deckService.cloneStarterDeck(id, user.userId()));
+    }
+
     @GetMapping("/{id}")
     public DeckDetailDTO getDeck(
             @PathVariable UUID id,

@@ -100,5 +100,26 @@ class DeckControllerTest {
 
         mockMvc.perform(delete("/api/decks/" + deckId).header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isNoContent());
+
+        UUID starterId = UUID.randomUUID();
+        when(deckService.listStarterDecks()).thenReturn(List.of(
+                new DeckSummaryDTO(starterId, "Brushfire (Fuego / Planta)", "Starter", true, true, true, 60, Instant.now(), Instant.now())
+        ));
+        when(deckService.cloneStarterDeck(starterId, userId)).thenReturn(new DeckDetailDTO(
+                UUID.randomUUID(), userId, "Brushfire (Fuego / Planta) (Copia)", "Starter", false, false, true, 60,
+                new DeckValidationResult(true, List.of()), List.of(), Instant.now(), Instant.now()
+        ));
+
+        mockMvc.perform(get("/api/decks/starters").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].starter").value(true))
+                .andExpect(jsonPath("$[0].cpuEligible").value(true));
+
+        mockMvc.perform(post("/api/decks/starters/" + starterId + "/clone")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.starter").value(false))
+                .andExpect(jsonPath("$.valid").value(true))
+                .andExpect(jsonPath("$.totalCards").value(60));
     }
 }

@@ -103,6 +103,40 @@ public class DeckService {
         deckRepository.delete(deck);
     }
 
+    @Transactional
+    public DeckDetailDTO cloneStarterDeck(UUID starterId, UUID userId) {
+        DeckEntity source = deckRepository.findWithCardsById(starterId)
+                .orElseThrow(() -> new ResourceNotFoundException("Starter deck not found: " + starterId));
+
+        if (!source.isStarter()) {
+            throw new ForbiddenException("Only starter decks can be cloned from this endpoint");
+        }
+
+        String copyName = source.getName() + " (Copia)";
+        if (copyName.length() > 120) {
+            copyName = copyName.substring(0, 120);
+        }
+
+        Instant now = Instant.now();
+        DeckEntity copy = new DeckEntity();
+        copy.setId(UUID.randomUUID());
+        copy.setOwnerId(userId);
+        copy.setName(copyName);
+        copy.setDescription(source.getDescription());
+        copy.setStarter(false);
+        copy.setCpuEligible(false);
+        copy.setValid(source.isValid());
+        copy.setCreatedAt(now);
+        copy.setUpdatedAt(now);
+
+        for (DeckCardEntity cardEntry : source.getCards()) {
+            copy.getCards().add(new DeckCardEntity(copy, cardEntry.getCard(), cardEntry.getQuantity()));
+        }
+
+        DeckEntity saved = deckRepository.save(copy);
+        return toDetailDto(saved);
+    }
+
     private void applyDeckUpdate(DeckEntity deck, SaveDeckRequest request, Instant now) {
         deck.setName(request.name().trim());
         deck.setDescription(request.description() != null ? request.description().trim() : null);
