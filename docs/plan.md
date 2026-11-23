@@ -7,7 +7,7 @@
 | ID | Fase | Estado | Avance |
 | :--- | :--- | :---: | :---: |
 | F1 | Monorepo, Infraestructura y Catálogo | `[x]` | `100%` |
-| F2 | Usuarios, Deck Builder y Mazos Prearmados | `[~]` | `80%` |
+| F2 | Usuarios, Deck Builder y Mazos Prearmados | `[x]` | `100%` |
 | F3 | Motor PvE Básico (MVP Jugable vs. Máquina) | `[ ]` | `0%` |
 | F4 | Reglas Completas e IA Mejorada | `[ ]` | `0%` |
 
@@ -30,7 +30,7 @@
 - [x] **F2.2** — Crear migración `V3__decks_schema.sql`, validador puro `DeckValidator` (60 cartas, máx. 4 copias por nombre salvo Energías Básicas, ≥1 Pokémon Básico) y CRUD `/api/decks`. | *Módulos/archivos:* `deck-builder`, `/database/migrations`. | *Hecho:* batería JUnit 5 de reglas de mazo y tests CRUD en verde.
 - [x] **F2.3** — Implementar seeder idempotente de ≥2 mazos prearmados (`starter decks` válidos de `base1` reutilizables por jugador y CPU) + endpoint de listado y clonado. | *Módulos/archivos:* `deck-builder`. | *Hecho:* starters cargados pasan `DeckValidator` y se listan/clonan vía API.
 - [x] **F2.4** — Implementar Auth (`/login`, `/register`) con formularios reactivos, `AuthStore` (Signals), interceptor JWT, `authGuard` y resumen de perfil en Home (`/`). | *Módulos/archivos:* `web-app-core`, `auth-users`. | *Hecho:* usuario se autentica en la UI, persiste sesión y accede a rutas protegidas.
-- [ ] **F2.5** — Implementar Deck Builder: listado de mazos propios y starters clonables (`/decks`) y editor a 2 paneles (`/decks/:id`) con barra de validación en vivo (60 cartas, máx. 4 por nombre salvo Energías Básicas, ≥1 Básico). | *Módulos/archivos:* `web-app-core`, `deck-builder`. | *Hecho:* usuario arma/edita/guarda un mazo válido o clona un starter desde el navegador.
+- [x] **F2.5** — Implementar Deck Builder: listado de mazos propios y starters clonables (`/decks`) y editor a 2 paneles (`/decks/:id`) con barra de validación en vivo (60 cartas, máx. 4 por nombre salvo Energías Básicas, ≥1 Básico). | *Módulos/archivos:* `web-app-core`, `deck-builder`. | *Hecho:* usuario arma/edita/guarda un mazo válido o clona un starter desde el navegador.
 
 *Entregable usable:* Sistema de cuentas JWT + constructor de mazos validados con mazos prearmados listos para combatir.
 
@@ -73,3 +73,4 @@
 | 2026-11-23 | F2.2 | Creada migración `V3__decks_schema.sql`, validador puro `DeckValidator` (consolidación de `cardId`, 60 cartas, máx. 4 copias por nombre salvo Energías Básicas `'Basic'`/`'Normal'`, `≥1` Pokémon Básico) y CRUD `/api/decks` (`DeckService`, `DeckController`) con borradores y control `403`. Verificado: Flyway aplicó `V3` y `mvn test` (`27/27`) en verde. | F2.3 |
 | 2026-11-23 | F2.3 | Anotados `CatalogStartupInitializer` (`@Order(10)`) y `StarterDeckSeeder` (`@Order(20)`) sembrando 3 *starter decks* de 60 cartas de `base1` (`Brushfire`, `Zap! & Torrent`, `Blackout`) + endpoints `GET /api/decks/starters` y `POST /api/decks/starters/{id}/clone`. Verificado: `mvn test` (`28/28`) en verde comprobando validez, idempotencia y clonado en PostgreSQL. | F2.4 |
 | 2026-11-23 | F2.4 | Implementadas vistas `/login` y `/register` con formularios reactivos, `AuthStore` (Signals + persistencia JWT), `jwtInterceptor`, `authGuard`/`guestGuard`, resumen de perfil en Home (`/`) y toggle de favoritas en `CardDetailModalComponent`. Verificado: `ng build` y `ng test` (`4/4` ChromeHeadless) en verde. | F2.5 |
+| 2026-11-23 | F2.5 | Implementado Deck Builder en Angular (`DeckListPageComponent` `/decks`, editor a 2 paneles `DeckEditorPageComponent` `/decks/new` y `/decks/:id`, `DeckBuilderStore` y `DeckValidationBarComponent` en vivo) protegido por `authGuard`. Verificado: `ng build` y `ng test` (`6/6` ChromeHeadless) en verde. **Fase F2 completada (100%).** | F3.1 |

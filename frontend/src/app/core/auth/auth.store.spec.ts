@@ -14,7 +14,7 @@ describe('AuthStore, jwtInterceptor, and guards', () => {
     localStorage.clear();
     TestBed.configureTestingModule({
       providers: [
-        provideRouter([]),
+        provideRouter([{ path: '**', children: [] }]),
         provideHttpClient(withInterceptors([jwtInterceptor])),
         provideHttpClientTesting()
       ]

@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { guestGuard } from './core/auth/auth.guard';
+import { authGuard, guestGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
   {
@@ -14,15 +14,21 @@ export const routes: Routes = [
   },
   {
     path: 'decks',
+    canActivate: [authGuard],
     loadComponent: () =>
-      import('./shared/ui/feature-placeholder/feature-placeholder.component').then(
-        (m) => m.FeaturePlaceholderComponent
-      ),
-    data: {
-      phase: 'Fase 2',
-      title: 'Deck Builder (En construcción)',
-      description: 'Aquí podrás crear, editar y validar tus mazos de 60 cartas y clonar starter decks.'
-    }
+      import('./features/deck-builder/deck-list-page.component').then((m) => m.DeckListPageComponent)
+  },
+  {
+    path: 'decks/new',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/deck-builder/deck-editor-page.component').then((m) => m.DeckEditorPageComponent)
+  },
+  {
+    path: 'decks/:id',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/deck-builder/deck-editor-page.component').then((m) => m.DeckEditorPageComponent)
   },
   {
     path: 'play/setup',

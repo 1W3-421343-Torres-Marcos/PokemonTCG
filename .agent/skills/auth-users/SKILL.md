@@ -36,7 +36,7 @@ Gestión de identidad, autenticación JWT stateless, perfil del jugador, lista d
 - `backend/src/test/java/com/pokemontcg/auth/**`
 
 ## Criterios de aceptación
-- [ ] Migración `V2__users_schema.sql` aplicada limpiamente.
-- [ ] Registro y login emiten JWT válido y autentican rutas protegidas con `JwtAuthenticationFilter`.
-- [ ] Endpoints de perfil (`/api/users/me`) y favoritas validados por tests de seguridad/controlador.
-- [ ] `UserStatsService.recordMatchResult` actualiza `matches_played` y `matches_won` tras fin de partida.
+- [x] Migración `V2__users_schema.sql` aplicada limpiamente.
+- [x] Registro y login emiten JWT válido y autentican rutas protegidas con `JwtAuthenticationFilter`.
+- [x] Endpoints de perfil (`/api/users/me`) y favoritas validados por tests de seguridad/controlador.
+- [x] `UserStatsService.recordMatchResult` actualiza `matches_played` y `matches_won` tras fin de partida.

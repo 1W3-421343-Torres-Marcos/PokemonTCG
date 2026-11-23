@@ -37,7 +37,7 @@ Persistencia CRUD de mazos de usuario, motor puro de validación oficial de Pok�
 - `backend/src/test/java/com/pokemontcg/deck/**`
 
 ## Criterios de aceptación
-- [ ] Migración `V3__decks_schema.sql` aplicada limpiamente.
-- [ ] `DeckValidator` probado con JUnit 5 cubriendo 60 cartas, límite de 4 por nombre, excepción de Energías Básicas y ≥1 Pokémon Básico.
-- [ ] Al menos 2 starter decks válidos de `base1` sembrados de forma idempotente y utilizables por jugador/CPU.
-- [ ] CRUD de mazos y clonado de starters protegidos por usuario autenticado y verificados con tests.
+- [x] Migración `V3__decks_schema.sql` aplicada limpiamente.
+- [x] `DeckValidator` probado con JUnit 5 cubriendo 60 cartas, límite de 4 por nombre, excepción de Energías Básicas y ≥1 Pokémon Básico.
+- [x] Al menos 2 starter decks válidos de `base1` sembrados de forma idempotente y utilizables por jugador/CPU.
+- [x] CRUD de mazos y clonado de starters protegidos por usuario autenticado y verificados con tests.
