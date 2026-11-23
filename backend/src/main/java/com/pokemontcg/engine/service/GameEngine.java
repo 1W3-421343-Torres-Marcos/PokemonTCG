@@ -25,9 +25,11 @@ import com.pokemontcg.engine.model.PokemonInPlay;
 import com.pokemontcg.engine.model.StatusCondition;
 import com.pokemontcg.engine.model.TurnPhase;
 import com.pokemontcg.engine.model.WinReason;
+import com.pokemontcg.engine.random.DefaultRandomProvider;
 import com.pokemontcg.engine.random.RandomProvider;
 import com.pokemontcg.engine.rules.DamageCalculator;
 import com.pokemontcg.engine.rules.EnergyCostMatcher;
+import com.pokemontcg.engine.rules.StatusRules;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -45,6 +47,16 @@ public class GameEngine {
     public static final int PRIZE_COUNT = 6;
     public static final int MAX_BENCH_SIZE = 5;
     private static final int MAX_MULLIGANS = 50;
+
+    private final RandomProvider randomProvider;
+
+    public GameEngine() {
+        this(new DefaultRandomProvider());
+    }
+
+    public GameEngine(RandomProvider randomProvider) {
+        this.randomProvider = Objects.requireNonNull(randomProvider, "randomProvider must not be null");
+    }
 
     public EngineStepResult initializeMatch(
             List<CardDefinition> playerDeck,
@@ -381,6 +393,9 @@ public class GameEngine {
         if (attacker == null) {
             throw new IllegalGameActionException("No tienes ningún Pokémon Activo para atacar");
         }
+        if (StatusRules.blocksAttackOrRetreat(attacker)) {
+            throw new IllegalGameActionException("Un Pokémon Dormido o Paralizado no puede atacar");
+        }
 
         List<AttackDefinition> attacks = attacker.activeCard().definition().attacks();
         if (action.attackIndex() < 0 || action.attackIndex() >= attacks.size()) {
@@ -397,6 +412,35 @@ public class GameEngine {
         PokemonInPlay defender = defenderState.active();
         if (defender == null) {
             throw new IllegalGameActionException("El rival no tiene Pokémon Activo");
+        }
+
+        if (attacker.statusConditions().contains(StatusCondition.CONFUSED)) {
+            boolean heads = randomProvider.flipCoin();
+            events.emit(
+                    GameEventType.COIN_FLIPPED,
+                    actor,
+                    attacker.activeCard().definition().name() + " está Confundido: lanzó moneda y salió "
+                            + (heads ? "CARA." : "CRUZ (30 de daño propio)."),
+                    Map.of("reason", "CONFUSION", "result", heads ? "HEADS" : "TAILS", "heads", heads)
+            );
+            if (!heads) {
+                PokemonInPlay selfDamaged = attacker.withDamage(attacker.damage() + 30);
+                events.emit(
+                        GameEventType.DAMAGE_DEALT,
+                        actor,
+                        selfDamaged.activeCard().definition().name() + " se hirió a sí mismo con 30 de daño ("
+                                + selfDamaged.remainingHp() + "/" + selfDamaged.maxHp() + " PS).",
+                        Map.of(
+                                "targetName", selfDamaged.activeCard().definition().name(),
+                                "damage", 30,
+                                "remainingHp", selfDamaged.remainingHp(),
+                                "maxHp", selfDamaged.maxHp(),
+                                "selfDamage", true
+                        )
+                );
+                GameState afterConfusion = state.withPlayer(actor, replaceActive(attackerState, selfDamaged));
+                return resolveKnockOutsAndProceed(afterConfusion, actor, TurnPhase.ATTACK_PHASE, events);
+            }
         }
 
         events.emit(
@@ -427,87 +471,8 @@ public class GameEngine {
                 )
         );
 
-        if (!damagedDefender.knockedOut()) {
-            GameState afterAttack = state.withPlayer(defenderId, replaceActive(defenderState, damagedDefender));
-            GameState nextTurnState = advanceToNextTurn(afterAttack, actor, events);
-            return new EngineStepResult(nextTurnState, events.events());
-        }
-
-        // Knock Out resolution
-        List<CardInstance> nextDefenderDiscard = new ArrayList<>(defenderState.discardPile());
-        nextDefenderDiscard.addAll(damagedDefender.allCards());
-        PlayerState koDefenderState = new PlayerState(
-                defenderState.deck(),
-                defenderState.hand(),
-                null,
-                defenderState.bench(),
-                defenderState.prizes(),
-                nextDefenderDiscard,
-                defenderState.energyAttachedThisTurn(),
-                defenderState.retreatedThisTurn(),
-                defenderState.setupReady(),
-                defenderState.mulliganCount()
-        );
-
-        events.emit(
-                GameEventType.POKEMON_KNOCKED_OUT,
-                defenderId,
-                damagedDefender.activeCard().definition().name() + " quedó Fuera de Combate.",
-                Map.of("pokemonName", damagedDefender.activeCard().definition().name())
-        );
-
-        PlayerState nextAttackerState = attackerState;
-        if (!attackerState.prizes().isEmpty()) {
-            List<CardInstance> nextPrizes = new ArrayList<>(attackerState.prizes());
-            CardInstance prizeCard = nextPrizes.remove(0);
-            List<CardInstance> nextAttackerHand = new ArrayList<>(attackerState.hand());
-            nextAttackerHand.add(prizeCard);
-
-            nextAttackerState = new PlayerState(
-                    attackerState.deck(),
-                    nextAttackerHand,
-                    attackerState.active(),
-                    attackerState.bench(),
-                    nextPrizes,
-                    attackerState.discardPile(),
-                    attackerState.energyAttachedThisTurn(),
-                    attackerState.retreatedThisTurn(),
-                    attackerState.setupReady(),
-                    attackerState.mulliganCount()
-            );
-
-            events.emit(
-                    GameEventType.PRIZE_TAKEN,
-                    actor,
-                    displayPlayer(actor) + " tomó 1 carta de Premio (" + nextPrizes.size() + " restantes).",
-                    Map.of("prizesRemaining", nextPrizes.size())
-            );
-        }
-
-        GameState afterKoState = state
-                .withPlayer(actor, nextAttackerState)
-                .withPlayer(defenderId, koDefenderState);
-
-        if (nextAttackerState.prizes().isEmpty()) {
-            return finishMatch(afterKoState, actor, WinReason.ALL_PRIZES_TAKEN, events);
-        }
-
-        if (koDefenderState.bench().isEmpty()) {
-            return finishMatch(afterKoState, actor, WinReason.NO_POKEMON_LEFT, events);
-        }
-
-        GameState awaitingPromotion = new GameState(
-                afterKoState.turnNumber(),
-                afterKoState.activePlayer(),
-                afterKoState.startingPlayer(),
-                TurnPhase.POKEMON_CHECKUP,
-                defenderId,
-                afterKoState.players(),
-                null,
-                null,
-                events.nextSequence()
-        );
-        return new EngineStepResult(awaitingPromotion, events.events());
+        GameState afterAttack = state.withPlayer(defenderId, replaceActive(defenderState, damagedDefender));
+        return resolveKnockOutsAndProceed(afterAttack, actor, TurnPhase.ATTACK_PHASE, events);
     }
 
     private EngineStepResult handlePromoteActive(
@@ -543,7 +508,8 @@ public class GameEngine {
                 actorState.energyAttachedThisTurn(),
                 actorState.retreatedThisTurn(),
                 actorState.setupReady(),
-                actorState.mulliganCount()
+                actorState.mulliganCount(),
+                actorState.plusPowerBonus()
         );
 
         events.emit(
@@ -553,26 +519,47 @@ public class GameEngine {
                 Map.of("pokemonName", promoted.activeCard().definition().name())
         );
 
-        GameState updated = new GameState(
-                state.turnNumber(),
-                state.activePlayer(),
-                state.startingPlayer(),
+        GameState updated = state.withPlayer(actor, updatedActorState);
+        PlayerId secondPlayer = actor.opponent();
+        if (updated.player(secondPlayer).active() == null && !updated.player(secondPlayer).bench().isEmpty()) {
+            GameState nextPromo = new GameState(
+                    updated.turnNumber(),
+                    updated.activePlayer(),
+                    updated.startingPlayer(),
+                    state.phase(),
+                    secondPlayer,
+                    updated.players(),
+                    null,
+                    null,
+                    events.nextSequence()
+            );
+            return new EngineStepResult(nextPromo, events.events());
+        }
+
+        GameState clearedPromo = new GameState(
+                updated.turnNumber(),
+                updated.activePlayer(),
+                updated.startingPlayer(),
                 state.phase(),
                 null,
-                state.withPlayer(actor, updatedActorState).players(),
+                updated.players(),
                 null,
                 null,
                 events.nextSequence()
         );
 
-        GameState nextTurnState = advanceToNextTurn(updated, state.activePlayer(), events);
-        return new EngineStepResult(nextTurnState, events.events());
+        if (state.phase() == TurnPhase.POKEMON_CHECKUP) {
+            return new EngineStepResult(
+                    completeTurnTransitionAfterCheckup(clearedPromo, state.activePlayer(), events),
+                    events.events()
+            );
+        }
+        return executePokemonCheckupAndAdvance(clearedPromo, state.activePlayer(), events);
     }
 
     private EngineStepResult handleEndTurn(GameState state, PlayerId actor, EventCollector events) {
         requireMainPhaseAndTurn(state, actor);
-        GameState nextTurnState = advanceToNextTurn(state, actor, events);
-        return new EngineStepResult(nextTurnState, events.events());
+        return executePokemonCheckupAndAdvance(state, actor, events);
     }
 
     private EngineStepResult handleEvolve(
@@ -829,7 +816,236 @@ public class GameEngine {
     private record RetreatPayment(List<CardInstance> paid, List<CardInstance> remaining) {
     }
 
-    private GameState advanceToNextTurn(GameState state, PlayerId endingPlayer, EventCollector events) {
+    private EngineStepResult resolveKnockOutsAndProceed(
+            GameState state,
+            PlayerId turnOwner,
+            TurnPhase originPhase,
+            EventCollector events
+    ) {
+        PlayerId opponent = turnOwner.opponent();
+        GameState current = state;
+        boolean opponentKo = isActiveKnockedOut(current, opponent);
+        boolean ownerKo = isActiveKnockedOut(current, turnOwner);
+
+        if (!opponentKo && !ownerKo) {
+            if (originPhase == TurnPhase.ATTACK_PHASE) {
+                return executePokemonCheckupAndAdvance(current, turnOwner, events);
+            }
+            return new EngineStepResult(completeTurnTransitionAfterCheckup(current, turnOwner, events), events.events());
+        }
+
+        if (opponentKo) {
+            current = discardKnockedOutAndAwardPrize(current, opponent, turnOwner, events);
+        }
+        if (ownerKo) {
+            current = discardKnockedOutAndAwardPrize(current, turnOwner, opponent, events);
+        }
+
+        PlayerState pState = current.player(PlayerId.PLAYER);
+        PlayerState cState = current.player(PlayerId.CPU);
+        int playerWinConditions = (pState.prizes().isEmpty() ? 1 : 0)
+                + (cState.active() == null && cState.bench().isEmpty() ? 1 : 0);
+        int cpuWinConditions = (cState.prizes().isEmpty() ? 1 : 0)
+                + (pState.active() == null && pState.bench().isEmpty() ? 1 : 0);
+
+        if (playerWinConditions > 0 || cpuWinConditions > 0) {
+            PlayerId winner;
+            if (playerWinConditions > cpuWinConditions) {
+                winner = PlayerId.PLAYER;
+            } else if (cpuWinConditions > playerWinConditions) {
+                winner = PlayerId.CPU;
+            } else {
+                winner = turnOwner;
+            }
+            WinReason reason = current.player(winner).prizes().isEmpty()
+                    ? WinReason.ALL_PRIZES_TAKEN
+                    : WinReason.NO_POKEMON_LEFT;
+            return finishMatch(current, winner, reason, events);
+        }
+
+        PlayerId firstToPromote = null;
+        if (current.player(opponent).active() == null) {
+            firstToPromote = opponent;
+        } else if (current.player(turnOwner).active() == null) {
+            firstToPromote = turnOwner;
+        }
+
+        if (firstToPromote != null) {
+            GameState awaitingPromotion = new GameState(
+                    current.turnNumber(),
+                    current.activePlayer(),
+                    current.startingPlayer(),
+                    originPhase,
+                    firstToPromote,
+                    current.players(),
+                    null,
+                    null,
+                    events.nextSequence()
+            );
+            return new EngineStepResult(awaitingPromotion, events.events());
+        }
+
+        if (originPhase == TurnPhase.ATTACK_PHASE) {
+            return executePokemonCheckupAndAdvance(current, turnOwner, events);
+        }
+        return new EngineStepResult(completeTurnTransitionAfterCheckup(current, turnOwner, events), events.events());
+    }
+
+    private boolean isActiveKnockedOut(GameState state, PlayerId owner) {
+        PokemonInPlay active = state.player(owner).active();
+        return active != null && active.knockedOut();
+    }
+
+    private GameState discardKnockedOutAndAwardPrize(
+            GameState state,
+            PlayerId koOwner,
+            PlayerId prizeTaker,
+            EventCollector events
+    ) {
+        PlayerState koState = state.player(koOwner);
+        PokemonInPlay koPokemon = koState.active();
+        if (koPokemon == null) {
+            return state;
+        }
+
+        List<CardInstance> nextDiscard = new ArrayList<>(koState.discardPile());
+        nextDiscard.addAll(koPokemon.allCards());
+        PlayerState updatedKoOwner = new PlayerState(
+                koState.deck(),
+                koState.hand(),
+                null,
+                koState.bench(),
+                koState.prizes(),
+                nextDiscard,
+                koState.energyAttachedThisTurn(),
+                koState.retreatedThisTurn(),
+                koState.setupReady(),
+                koState.mulliganCount(),
+                koState.plusPowerBonus()
+        );
+
+        events.emit(
+                GameEventType.POKEMON_KNOCKED_OUT,
+                koOwner,
+                koPokemon.activeCard().definition().name() + " quedó Fuera de Combate.",
+                Map.of("pokemonName", koPokemon.activeCard().definition().name())
+        );
+
+        GameState current = state.withPlayer(koOwner, updatedKoOwner);
+        PlayerState takerState = current.player(prizeTaker);
+        if (!takerState.prizes().isEmpty()) {
+            List<CardInstance> nextPrizes = new ArrayList<>(takerState.prizes());
+            CardInstance prizeCard = nextPrizes.remove(0);
+            List<CardInstance> nextHand = new ArrayList<>(takerState.hand());
+            nextHand.add(prizeCard);
+            PlayerState updatedTaker = new PlayerState(
+                    takerState.deck(),
+                    nextHand,
+                    takerState.active(),
+                    takerState.bench(),
+                    nextPrizes,
+                    takerState.discardPile(),
+                    takerState.energyAttachedThisTurn(),
+                    takerState.retreatedThisTurn(),
+                    takerState.setupReady(),
+                    takerState.mulliganCount(),
+                    takerState.plusPowerBonus()
+            );
+            current = current.withPlayer(prizeTaker, updatedTaker);
+
+            events.emit(
+                    GameEventType.PRIZE_TAKEN,
+                    prizeTaker,
+                    displayPlayer(prizeTaker) + " tomó 1 carta de Premio (" + nextPrizes.size() + " restantes).",
+                    Map.of("prizesRemaining", nextPrizes.size())
+            );
+        }
+        return current;
+    }
+
+    private EngineStepResult executePokemonCheckupAndAdvance(
+            GameState state,
+            PlayerId endingPlayer,
+            EventCollector events
+    ) {
+        GameState current = state;
+        for (PlayerId pid : List.of(endingPlayer, endingPlayer.opponent())) {
+            PlayerState ps = current.player(pid);
+            PokemonInPlay active = ps.active();
+            if (active == null || active.statusConditions().isEmpty()) {
+                continue;
+            }
+
+            PokemonInPlay updatedActive = active;
+            if (updatedActive.statusConditions().contains(StatusCondition.POISONED)) {
+                updatedActive = updatedActive.withDamage(updatedActive.damage() + 10);
+                events.emit(
+                        GameEventType.CHECKUP_TICK,
+                        pid,
+                        updatedActive.activeCard().definition().name() + " sufrió 10 de daño por Veneno ("
+                                + updatedActive.remainingHp() + "/" + updatedActive.maxHp() + " PS).",
+                        Map.of("status", StatusCondition.POISONED.name(), "damage", 10)
+                );
+            }
+
+            if (updatedActive.statusConditions().contains(StatusCondition.BURNED)) {
+                updatedActive = updatedActive.withDamage(updatedActive.damage() + 20);
+                events.emit(
+                        GameEventType.CHECKUP_TICK,
+                        pid,
+                        updatedActive.activeCard().definition().name() + " sufrió 20 de daño por Quemadura ("
+                                + updatedActive.remainingHp() + "/" + updatedActive.maxHp() + " PS).",
+                        Map.of("status", StatusCondition.BURNED.name(), "damage", 20)
+                );
+                boolean heads = randomProvider.flipCoin();
+                events.emit(
+                        GameEventType.COIN_FLIPPED,
+                        pid,
+                        "Checkup Quemadura de " + updatedActive.activeCard().definition().name() + ": "
+                                + (heads ? "CARA (se recupera)." : "CRUZ (continúa quemado)."),
+                        Map.of("reason", "BURN", "result", heads ? "HEADS" : "TAILS", "heads", heads)
+                );
+                if (heads) {
+                    updatedActive = StatusRules.removeStatus(updatedActive, StatusCondition.BURNED);
+                }
+            }
+
+            if (updatedActive.statusConditions().contains(StatusCondition.ASLEEP)) {
+                boolean heads = randomProvider.flipCoin();
+                events.emit(
+                        GameEventType.COIN_FLIPPED,
+                        pid,
+                        "Checkup Sueño de " + updatedActive.activeCard().definition().name() + ": "
+                                + (heads ? "CARA (despierta)." : "CRUZ (sigue dormido)."),
+                        Map.of("reason", "SLEEP", "result", heads ? "HEADS" : "TAILS", "heads", heads)
+                );
+                if (heads) {
+                    updatedActive = StatusRules.removeStatus(updatedActive, StatusCondition.ASLEEP);
+                }
+            }
+
+            if (pid == endingPlayer && updatedActive.statusConditions().contains(StatusCondition.PARALYZED)) {
+                updatedActive = StatusRules.removeStatus(updatedActive, StatusCondition.PARALYZED);
+                events.emit(
+                        GameEventType.CHECKUP_TICK,
+                        pid,
+                        updatedActive.activeCard().definition().name() + " se recuperó de la Parálisis.",
+                        Map.of("statusCleared", StatusCondition.PARALYZED.name())
+                );
+            }
+
+            current = current.withPlayer(pid, replaceActive(ps, updatedActive));
+        }
+
+        current = purgeExpiredModifiers(current, current.turnNumber());
+        return resolveKnockOutsAndProceed(current, endingPlayer, TurnPhase.POKEMON_CHECKUP, events);
+    }
+
+    private GameState completeTurnTransitionAfterCheckup(
+            GameState state,
+            PlayerId endingPlayer,
+            EventCollector events
+    ) {
         GameState cleaned = purgeExpiredModifiers(state, state.turnNumber());
         PlayerState resetEnding = resetTurnFlags(cleaned.player(endingPlayer));
         GameState afterReset = cleaned.withPlayer(endingPlayer, resetEnding);

@@ -269,7 +269,7 @@ class GameEngineTest {
         );
 
         EngineStepResult koResult = engine.applyAction(state, PlayerId.PLAYER, new AttackAction(0));
-        assertThat(koResult.state().phase()).isEqualTo(TurnPhase.POKEMON_CHECKUP);
+        assertThat(koResult.state().phase()).isEqualTo(TurnPhase.ATTACK_PHASE);
         assertThat(koResult.state().awaitingPromotionPlayer()).isEqualTo(PlayerId.CPU);
         assertThat(koResult.state().player(PlayerId.PLAYER).prizes()).hasSize(1);
         assertThat(koResult.state().player(PlayerId.PLAYER).hand()).hasSize(1); // Took 1 prize card
