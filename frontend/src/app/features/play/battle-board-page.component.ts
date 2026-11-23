@@ -7,7 +7,14 @@ import { EnergyBadgeComponent } from '../../shared/ui/energy-badge/energy-badge.
 import { EventLogFeedComponent } from '../../shared/ui/event-log-feed/event-log-feed.component';
 import { HpBarComponent } from '../../shared/ui/hp-bar/hp-bar.component';
 import { MatchResultModalComponent } from '../../shared/ui/match-result-modal/match-result-modal.component';
-import { MatchStore, isBasicPokemon, isEnergyCard } from './match.store';
+import { StatusBadgeComponent } from '../../shared/ui/status-badge/status-badge.component';
+import {
+  MatchStore,
+  isBasicPokemon,
+  isEnergyCard,
+  isEvolutionCard,
+  isTrainerCard
+} from './match.store';
 
 @Component({
   selector: 'app-battle-board-page',
@@ -15,6 +22,7 @@ import { MatchStore, isBasicPokemon, isEnergyCard } from './match.store';
   imports: [
     EnergyBadgeComponent,
     HpBarComponent,
+    StatusBadgeComponent,
     EventLogFeedComponent,
     DiscardPileModalComponent,
     CardDetailModalComponent,
@@ -57,7 +65,11 @@ import { MatchStore, isBasicPokemon, isEnergyCard } from './match.store';
               <div class="bench-slots">
                 @for (slot of benchIndices; track slot) {
                   @if (view.opponent.bench[slot]; as mon) {
-                    <div class="bench-card">
+                    <div
+                      class="bench-card"
+                      [class.interactive]="isValidTarget(mon.instanceId)"
+                      [class.valid-target]="isValidTarget(mon.instanceId)"
+                      (click)="onOpponentPokemonClick(mon.instanceId)">
                       <button
                         type="button"
                         class="inspect-mini"
@@ -84,7 +96,13 @@ import { MatchStore, isBasicPokemon, isEnergyCard } from './match.store';
 
               <div class="active-slot">
                 @if (view.opponent.active; as oppActive) {
-                  <div class="active-card rival-active">
+                  <div
+                    class="active-card rival-active"
+                    [class.interactive]="isValidTarget(oppActive.instanceId)"
+                    [class.valid-target]="isValidTarget(oppActive.instanceId)"
+                    [class.anim-hit]="isRivalHitAnim()"
+                    [class.anim-evolve]="isRivalEvolveAnim()"
+                    (click)="onOpponentPokemonClick(oppActive.instanceId)">
                     <button
                       type="button"
                       class="inspect-mini"
@@ -102,6 +120,13 @@ import { MatchStore, isBasicPokemon, isEnergyCard } from './match.store';
                           <span class="dmg-badge mono-num">-{{ oppActive.damage }}</span>
                         }
                       </div>
+                      @if (oppActive.statusConditions.length > 0) {
+                        <div class="status-row">
+                          @for (cond of oppActive.statusConditions; track cond) {
+                            <app-status-badge [condition]="cond" />
+                          }
+                        </div>
+                      }
                       <app-hp-bar [currentHp]="oppActive.remainingHp" [maxHp]="oppActive.maxHp" />
                       <div class="energy-row">
                         @for (e of oppActive.attachedEnergies; track e.instanceId) {
@@ -138,11 +163,13 @@ import { MatchStore, isBasicPokemon, isEnergyCard } from './match.store';
               </span>
 
               @if (store.activeAnimationEvent(); as activeEvt) {
-                <span class="live-ticker">{{ activeEvt.message }}</span>
+                <span class="live-ticker" [class.coin-flip]="isCoinFlipAnim()">{{ activeEvt.message }}</span>
               } @else if (store.isSetupPhase()) {
                 <span class="hint-text">Elige 1 Pokémon Básico Activo y hasta 5 en Banca.</span>
               } @else if (store.isPromotionRequired()) {
                 <span class="hint-text urgent">Haz clic en un Pokémon de tu Banca para promoverlo al Activo.</span>
+              } @else if (store.retreatMode()) {
+                <span class="hint-text urgent">Modo Retirada: haz clic en un Pokémon de tu Banca para relevar a tu Activo.</span>
               } @else if (selectedHandHint()) {
                 <span class="hint-text">{{ selectedHandHint() }}</span>
               } @else if (view.turnNumber === 1 && view.phase === 'MAIN_PHASE') {
@@ -194,11 +221,24 @@ import { MatchStore, isBasicPokemon, isEnergyCard } from './match.store';
                     Enviar a Banca
                   </button>
                 }
+                @if (store.selectedInstantTrainerPlayable()) {
+                  <button
+                    type="button"
+                    class="btn-accent"
+                    [disabled]="store.isInteractiveBlocked()"
+                    (click)="store.playSelectedTrainerInstant()">
+                    Jugar {{ store.selectedHandCard()?.name }}
+                  </button>
+                }
                 <button
                   type="button"
                   class="btn-ghost"
-                  disabled
-                  title="Retirada disponible en Fase 4">Retirar (F4)</button>
+                  [class.btn-accent]="store.retreatMode()"
+                  [disabled]="!store.isMyMainTurn() || !view.canRetreat || store.isInteractiveBlocked()"
+                  [title]="view.canRetreat ? 'Retirar Pokémon Activo por uno de la Banca' : 'Retirada no disponible'"
+                  (click)="store.toggleRetreatMode()">
+                  {{ store.retreatMode() ? 'Cancelar Retirada' : 'Retirar (' + (view.myActive?.activeCard?.retreatCost ?? 0) + ' E)' }}
+                </button>
                 <button
                   type="button"
                   class="btn-secondary"
@@ -230,6 +270,9 @@ import { MatchStore, isBasicPokemon, isEnergyCard } from './match.store';
                   <div
                     class="active-card my-active"
                     [class.energy-target]="energyTargetMode()"
+                    [class.valid-target]="isValidTarget(myActive.instanceId)"
+                    [class.anim-hit]="isPlayerHitAnim()"
+                    [class.anim-evolve]="isPlayerEvolveAnim()"
                     (click)="onTargetPokemonClick(myActive.instanceId)">
                     <button
                       type="button"
@@ -248,6 +291,13 @@ import { MatchStore, isBasicPokemon, isEnergyCard } from './match.store';
                           <span class="dmg-badge mono-num">-{{ myActive.damage }}</span>
                         }
                       </div>
+                      @if (myActive.statusConditions.length > 0) {
+                        <div class="status-row">
+                          @for (cond of myActive.statusConditions; track cond) {
+                            <app-status-badge [condition]="cond" />
+                          }
+                        </div>
+                      }
                       <app-hp-bar [currentHp]="myActive.remainingHp" [maxHp]="myActive.maxHp" />
                       <div class="energy-row">
                         @for (e of myActive.attachedEnergies; track e.instanceId) {
@@ -256,8 +306,8 @@ import { MatchStore, isBasicPokemon, isEnergyCard } from './match.store';
                           <span class="muted-mini">Sin energías</span>
                         }
                       </div>
-                      @if (energyTargetMode()) {
-                        <span class="target-tag">Clic para unir energía</span>
+                      @if (targetActionTag(myActive.instanceId); as actionLabel) {
+                        <span class="target-tag">{{ actionLabel }}</span>
                       }
                     </div>
                   </div>
@@ -274,6 +324,7 @@ import { MatchStore, isBasicPokemon, isEnergyCard } from './match.store';
                     <div
                       class="bench-card interactive"
                       [class.energy-target]="energyTargetMode()"
+                      [class.valid-target]="isValidTarget(mon.instanceId) || store.retreatMode()"
                       [class.promote-target]="store.isPromotionRequired()"
                       (click)="onMyBenchCardClick(mon)">
                       <button
@@ -327,6 +378,7 @@ import { MatchStore, isBasicPokemon, isEnergyCard } from './match.store';
                   class="hand-card"
                   [class.playable]="store.playableHandIds().has(card.instanceId)"
                   [class.selected]="isHandCardSelected(card)"
+                  [class.hand-target]="store.isHandTargetCard(card.instanceId)"
                   [class.setup-active]="store.setupActiveId() === card.instanceId"
                   [class.setup-bench]="store.setupBenchIds().includes(card.instanceId)"
                   (click)="store.onHandCardClick(card)">
@@ -340,8 +392,8 @@ import { MatchStore, isBasicPokemon, isEnergyCard } from './match.store';
                     <span class="role-badge active">ACTIVO</span>
                   } @else if (store.setupBenchIds().includes(card.instanceId)) {
                     <span class="role-badge bench">BANCA</span>
-                  } @else if (!isPlayableCategory(card)) {
-                    <span class="role-badge f4">F4</span>
+                  } @else if (store.isHandTargetCard(card.instanceId)) {
+                    <span class="role-badge discard">DESCARTAR</span>
                   }
 
                   @if (card.imageLowUrl) {
@@ -575,9 +627,46 @@ import { MatchStore, isBasicPokemon, isEnergyCard } from './match.store';
     }
     .active-card.my-active { border-color: rgba(255, 203, 5, 0.35); cursor: pointer; }
     .active-card.rival-active { border-color: rgba(59, 130, 246, 0.4); }
-    .energy-target, .promote-target {
+    .energy-target, .promote-target, .valid-target, .hand-target {
       border-color: var(--accent-primary) !important;
       box-shadow: var(--shadow-active-glow);
+      cursor: pointer;
+    }
+    .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .anim-hit {
+      animation: hitShake 360ms ease-in-out;
+    }
+    .anim-evolve {
+      animation: evolveGlow 440ms ease-out;
+    }
+    .live-ticker.coin-flip {
+      animation: coinPulse 380ms ease-in-out;
+    }
+    @keyframes hitShake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-6px); border-color: var(--state-danger); }
+      50% { transform: translateX(6px); }
+      80% { transform: translateX(-3px); }
+    }
+    @keyframes evolveGlow {
+      0% { transform: scale(1); filter: brightness(1); }
+      50% { transform: scale(1.04); filter: brightness(1.3); border-color: var(--state-success); }
+      100% { transform: scale(1); filter: brightness(1); }
+    }
+    @keyframes coinPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); color: #fef08a; }
+      100% { transform: scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .anim-hit, .anim-evolve, .live-ticker.coin-flip {
+        animation: none !important;
+      }
+      .hand-card { transition: none; }
     }
     .active-art img {
       width: 68px;
@@ -747,7 +836,7 @@ import { MatchStore, isBasicPokemon, isEnergyCard } from './match.store';
     }
     .role-badge.active { background: var(--accent-primary); color: #0b1020; }
     .role-badge.bench { background: var(--accent-secondary); color: #fff; }
-    .role-badge.f4 { background: rgba(11, 16, 32, 0.8); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+    .role-badge.discard { background: rgba(239, 68, 68, 0.85); color: #fff; }
     .side-log { min-height: 0; height: 100%; }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -768,7 +857,7 @@ export class BattleBoardPageComponent implements OnInit, OnDestroy {
         view &&
         this.store.isMyMainTurn() &&
         isBasicPokemon(card) &&
-        view.myBench.length < 5
+        card.playable
     );
   });
 
@@ -780,8 +869,40 @@ export class BattleBoardPageComponent implements OnInit, OnDestroy {
         view &&
         this.store.isMyMainTurn() &&
         isEnergyCard(card) &&
-        !view.energyAttachedThisTurn
+        card.playable
     );
+  });
+
+  protected readonly isPlayerHitAnim = computed(() => {
+    const evt = this.store.activeAnimationEvent();
+    if (!evt || evt.type !== 'DAMAGE_DEALT') {
+      return false;
+    }
+    const selfDmg = Boolean(evt.metadata['selfDamage']);
+    return (evt.actor === 'CPU' && !selfDmg) || (evt.actor === 'PLAYER' && selfDmg);
+  });
+
+  protected readonly isRivalHitAnim = computed(() => {
+    const evt = this.store.activeAnimationEvent();
+    if (!evt || evt.type !== 'DAMAGE_DEALT') {
+      return false;
+    }
+    const selfDmg = Boolean(evt.metadata['selfDamage']);
+    return (evt.actor === 'PLAYER' && !selfDmg) || (evt.actor === 'CPU' && selfDmg);
+  });
+
+  protected readonly isPlayerEvolveAnim = computed(() => {
+    const evt = this.store.activeAnimationEvent();
+    return evt?.type === 'POKEMON_EVOLVED' && evt.actor === 'PLAYER';
+  });
+
+  protected readonly isRivalEvolveAnim = computed(() => {
+    const evt = this.store.activeAnimationEvent();
+    return evt?.type === 'POKEMON_EVOLVED' && evt.actor === 'CPU';
+  });
+
+  protected readonly isCoinFlipAnim = computed(() => {
+    return this.store.activeAnimationEvent()?.type === 'COIN_FLIPPED';
   });
 
   protected readonly selectedHandHint = computed(() => {
@@ -790,16 +911,33 @@ export class BattleBoardPageComponent implements OnInit, OnDestroy {
       return null;
     }
     if (isBasicPokemon(card)) {
-      return (this.store.playerView()?.myBench.length ?? 0) < 5
+      return card.playable
         ? `Seleccionado ${card.name}: haz clic en un slot libre de Banca o "Enviar a Banca".`
         : 'Tu Banca ya tiene el máximo de 5 Pokémon.';
     }
     if (isEnergyCard(card)) {
-      return !this.store.playerView()?.energyAttachedThisTurn
+      return card.playable
         ? `Seleccionada ${card.name}: haz clic en tu Activo o un Pokémon de Banca para unirla.`
         : 'Ya adjuntaste una energía este turno.';
     }
-    return `${card.name}: Entrenadores y Evoluciones estarán disponibles en la Fase 4.`;
+    if (isEvolutionCard(card)) {
+      return card.playable
+        ? `Evolución ${card.name}: haz clic en un ${card.evolveFrom} elegible del tablero.`
+        : `No puedes evolucionar a ${card.name} en este momento (espera 1 turno desde que entró en juego).`;
+    }
+    if (isTrainerCard(card)) {
+      if (!card.playable) {
+        return `${card.name}: no se cumplen las condiciones actuales para jugarla.`;
+      }
+      if (card.validTargetIds.length === 0) {
+        return `Entrenador ${card.name}: haz clic en "Jugar ${card.name}".`;
+      }
+      if (card.cardId === 'base1-81') {
+        return `Energy Retrieval: haz clic en otra carta de tu mano para intercambiarla por hasta 2 Energías Básicas.`;
+      }
+      return `Entrenador ${card.name}: haz clic en uno de los objetivos resaltados en el tablero.`;
+    }
+    return card.name;
   });
 
   ngOnInit(): void {
@@ -822,11 +960,38 @@ export class BattleBoardPageComponent implements OnInit, OnDestroy {
     return this.store.selectedHandInstanceId() === card.instanceId;
   }
 
-  protected isPlayableCategory(card: CardViewDTO): boolean {
-    return isBasicPokemon(card) || isEnergyCard(card);
+  protected isValidTarget(pokemonInstanceId: string): boolean {
+    return this.store.selectedValidTargetIds().has(pokemonInstanceId);
+  }
+
+  protected targetActionTag(pokemonInstanceId: string): string | null {
+    if (!this.isValidTarget(pokemonInstanceId)) {
+      return null;
+    }
+    const card = this.store.selectedHandCard();
+    if (!card) {
+      return null;
+    }
+    if (isEnergyCard(card)) {
+      return 'Clic para unir energía';
+    }
+    if (isEvolutionCard(card)) {
+      return `Clic para evolucionar a ${card.name}`;
+    }
+    return `Clic para aplicar ${card.name}`;
+  }
+
+  protected onOpponentPokemonClick(pokemonInstanceId: string): void {
+    if (this.isValidTarget(pokemonInstanceId)) {
+      this.store.selectTargetForSelectedCard(pokemonInstanceId);
+    }
   }
 
   protected onTargetPokemonClick(pokemonInstanceId: string): void {
+    if (this.isValidTarget(pokemonInstanceId)) {
+      this.store.selectTargetForSelectedCard(pokemonInstanceId);
+      return;
+    }
     if (this.energyTargetMode()) {
       this.store.attachSelectedEnergyTo(pokemonInstanceId);
     }
@@ -835,6 +1000,14 @@ export class BattleBoardPageComponent implements OnInit, OnDestroy {
   protected onMyBenchCardClick(mon: PokemonViewDTO): void {
     if (this.store.isPromotionRequired()) {
       this.store.promoteBenchPokemon(mon.instanceId);
+      return;
+    }
+    if (this.store.retreatMode()) {
+      this.store.retreatToBench(mon.instanceId);
+      return;
+    }
+    if (this.isValidTarget(mon.instanceId)) {
+      this.store.selectTargetForSelectedCard(mon.instanceId);
       return;
     }
     if (this.energyTargetMode()) {

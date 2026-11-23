@@ -72,6 +72,8 @@ export interface CardViewDTO {
   providedEnergyCount: number;
   imageLowUrl: string | null;
   imageHighUrl: string | null;
+  playable: boolean;
+  validTargetIds: string[];
 }
 
 export interface PokemonViewDTO {
@@ -118,6 +120,7 @@ export interface PlayerViewDTO {
   myDeckCount: number;
   myPrizesRemaining: number;
   opponent: OpponentViewDTO;
+  canRetreat: boolean;
 }
 
 export interface GameEvent {
@@ -158,6 +161,9 @@ export type MatchActionType =
   | 'SELECT_SETUP'
   | 'PLAY_BASIC'
   | 'ATTACH_ENERGY'
+  | 'EVOLVE'
+  | 'PLAY_TRAINER'
+  | 'RETREAT'
   | 'ATTACK'
   | 'PROMOTE_ACTIVE'
   | 'END_TURN'
@@ -172,6 +178,9 @@ export interface MatchActionRequest {
   targetPokemonInstanceId?: string;
   attackIndex?: number;
   benchInstanceId?: string;
+  evolutionCardInstanceId?: string;
+  trainerCardInstanceId?: string;
+  discardEnergyInstanceIds?: string[];
 }
 
 export function toCardDetailFromView(card: CardViewDTO): CardDetail {

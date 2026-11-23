@@ -37,6 +37,7 @@ export class MatchStore {
   readonly selectedHandInstanceId = signal<string | null>(null);
   readonly setupActiveId = signal<string | null>(null);
   readonly setupBenchIds = signal<string[]>([]);
+  readonly retreatMode = signal<boolean>(false);
   readonly inspectCard = signal<CardDetail | null>(null);
   readonly discardModalSide = signal<'PLAYER' | 'CPU' | null>(null);
 
@@ -85,7 +86,7 @@ export class MatchStore {
 
     if (view.phase === 'SETUP' && !view.mySetupReady) {
       for (const card of view.myHand) {
-        if (isBasicPokemon(card)) {
+        if (card.playable || isBasicPokemon(card)) {
           ids.add(card.instanceId);
         }
       }
@@ -93,15 +94,33 @@ export class MatchStore {
     }
 
     if (view.phase === 'MAIN_PHASE' && view.activePlayer === 'PLAYER' && !view.awaitingPromotionPlayer) {
-      const canBench = view.myBench.length < 5;
-      const canEnergy = !view.energyAttachedThisTurn;
       for (const card of view.myHand) {
-        if ((canBench && isBasicPokemon(card)) || (canEnergy && isEnergyCard(card))) {
+        if (card.playable) {
           ids.add(card.instanceId);
         }
       }
     }
     return ids;
+  });
+
+  readonly selectedValidTargetIds = computed<Set<string>>(() => {
+    const card = this.selectedHandCard();
+    if (!card || !card.playable || !this.isMyMainTurn() || this.isInteractiveBlocked()) {
+      return new Set<string>();
+    }
+    return new Set(card.validTargetIds);
+  });
+
+  readonly selectedInstantTrainerPlayable = computed<boolean>(() => {
+    const card = this.selectedHandCard();
+    return Boolean(
+      card &&
+        this.isMyMainTurn() &&
+        !this.isInteractiveBlocked() &&
+        isTrainerCard(card) &&
+        card.playable &&
+        card.validTargetIds.length === 0
+    );
   });
 
   readonly canConfirmSetup = computed(() => Boolean(this.isSetupPhase() && this.setupActiveId()));
@@ -177,6 +196,19 @@ export class MatchStore {
       return;
     }
 
+    const currentSelected = this.selectedHandCard();
+    if (
+      currentSelected &&
+      currentSelected.instanceId !== card.instanceId &&
+      isTrainerCard(currentSelected) &&
+      currentSelected.playable &&
+      currentSelected.validTargetIds.includes(card.instanceId)
+    ) {
+      this.selectTargetForSelectedCard(card.instanceId);
+      return;
+    }
+
+    this.retreatMode.set(false);
     if (this.selectedHandInstanceId() === card.instanceId) {
       this.selectedHandInstanceId.set(null);
       return;
@@ -217,6 +249,86 @@ export class MatchStore {
       energyInstanceId: card.instanceId,
       targetPokemonInstanceId
     });
+  }
+
+  playSelectedTrainerInstant(): void {
+    const card = this.selectedHandCard();
+    if (!card || !this.selectedInstantTrainerPlayable()) {
+      return;
+    }
+    this.dispatchAction({
+      type: 'PLAY_TRAINER',
+      trainerCardInstanceId: card.instanceId
+    });
+  }
+
+  selectTargetForSelectedCard(targetInstanceId: string): void {
+    const card = this.selectedHandCard();
+    if (
+      !card ||
+      !card.playable ||
+      !this.isMyMainTurn() ||
+      this.isInteractiveBlocked() ||
+      !card.validTargetIds.includes(targetInstanceId)
+    ) {
+      return;
+    }
+
+    if (isEnergyCard(card)) {
+      this.dispatchAction({
+        type: 'ATTACH_ENERGY',
+        energyInstanceId: card.instanceId,
+        targetPokemonInstanceId: targetInstanceId
+      });
+      return;
+    }
+
+    if (isEvolutionCard(card)) {
+      this.dispatchAction({
+        type: 'EVOLVE',
+        evolutionCardInstanceId: card.instanceId,
+        targetPokemonInstanceId: targetInstanceId
+      });
+      return;
+    }
+
+    if (isTrainerCard(card)) {
+      this.dispatchAction({
+        type: 'PLAY_TRAINER',
+        trainerCardInstanceId: card.instanceId,
+        targetPokemonInstanceId: targetInstanceId
+      });
+    }
+  }
+
+  toggleRetreatMode(): void {
+    const view = this.playerView();
+    if (!view || !this.isMyMainTurn() || !view.canRetreat || this.isInteractiveBlocked()) {
+      return;
+    }
+    this.selectedHandInstanceId.set(null);
+    this.retreatMode.update((v) => !v);
+  }
+
+  retreatToBench(benchInstanceId: string): void {
+    const view = this.playerView();
+    if (!view || !this.retreatMode() || !this.isMyMainTurn() || !view.canRetreat || this.isInteractiveBlocked()) {
+      return;
+    }
+    this.dispatchAction({
+      type: 'RETREAT',
+      benchInstanceId
+    });
+  }
+
+  isHandTargetCard(cardInstanceId: string): boolean {
+    const selected = this.selectedHandCard();
+    return Boolean(
+      selected &&
+        selected.instanceId !== cardInstanceId &&
+        isTrainerCard(selected) &&
+        this.selectedValidTargetIds().has(cardInstanceId)
+    );
   }
 
   promoteBenchPokemon(benchInstanceId: string): void {
@@ -313,6 +425,7 @@ export class MatchStore {
     this.submitting.set(true);
     this.error.set(null);
     this.selectedHandInstanceId.set(null);
+    this.retreatMode.set(false);
 
     this.api
       .sendAction(id, action)
@@ -364,6 +477,7 @@ export class MatchStore {
 
   private resetSelectionState(): void {
     this.selectedHandInstanceId.set(null);
+    this.retreatMode.set(false);
     this.setupActiveId.set(null);
     this.setupBenchIds.set([]);
   }
@@ -373,8 +487,20 @@ export function isBasicPokemon(card: CardViewDTO): boolean {
   return card.category.toLowerCase() === 'pokemon' && (card.stage ?? '').toLowerCase() === 'basic';
 }
 
+export function isEvolutionCard(card: CardViewDTO): boolean {
+  if (card.category.toLowerCase() !== 'pokemon' || !card.stage) {
+    return false;
+  }
+  const normalized = card.stage.toLowerCase().replace(/\s+/g, '');
+  return normalized === 'stage1' || normalized === 'stage2';
+}
+
 export function isEnergyCard(card: CardViewDTO): boolean {
   return card.category.toLowerCase() === 'energy';
+}
+
+export function isTrainerCard(card: CardViewDTO): boolean {
+  return card.category.toLowerCase() === 'trainer';
 }
 
 function extractApiError(err: HttpErrorResponse, fallback: string): string {

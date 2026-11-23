@@ -114,13 +114,17 @@ import { MatchStore } from './match.store';
                 <p>Baja Básicos a banca, adjunta energía al Activo y prioriza el ataque habilitado de mayor daño.</p>
               </button>
 
-              <div class="deck-option disabled" aria-disabled="true">
+              <button
+                type="button"
+                class="deck-option"
+                [class.selected]="difficulty() === 'TACTICAL'"
+                (click)="difficulty.set('TACTICAL')">
                 <div class="opt-top">
                   <strong>Bot Táctico</strong>
-                  <span class="badge soon">Fase 4</span>
+                  <span class="badge ready">Disponible</span>
                 </div>
                 <p>Evoluciones, ventaja de tipo (×2 / -30), retirada defensiva y cartas Entrenador.</p>
-              </div>
+              </button>
             </div>
 
             <div class="launch-area">

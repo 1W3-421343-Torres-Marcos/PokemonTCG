@@ -36,5 +36,5 @@ Núcleo de reglas oficiales de Pokémon TCG en **Java 21 puro**, determinista y 
 ## Criterios de aceptación
 - [x] Cero imports de Spring/JPA en `com.pokemontcg.engine` y proyección `PlayerViewDTO` verificada sin fugas de mano/mazo rival.
 - [x] Flujo núcleo (F3: setup, robo, básicos, energía, ataque directo, KO, premios, victoria) probado en JUnit 5.
-- [ ] Reglas completas (F4: evolución, retirada, debilidad/resistencia, 5 estados alterados y Checkup determinista) probadas en JUnit 5.
-- [ ] `CardEffectRegistry` operativo con bloques componibles cubriendo cartas clave de `base1` sin condicionales monolíticos.
+- [x] Reglas completas (F4: evolución, retirada, debilidad/resistencia, 5 estados alterados y Checkup determinista) probadas en JUnit 5.
+- [x] `CardEffectRegistry` operativo con bloques componibles cubriendo cartas clave de `base1` sin condicionales monolíticos.
