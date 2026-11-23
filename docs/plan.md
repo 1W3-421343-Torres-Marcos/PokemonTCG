@@ -8,7 +8,7 @@
 | :--- | :--- | :---: | :---: |
 | F1 | Monorepo, Infraestructura y Catálogo | `[x]` | `100%` |
 | F2 | Usuarios, Deck Builder y Mazos Prearmados | `[x]` | `100%` |
-| F3 | Motor PvE Básico (MVP Jugable vs. Máquina) | `[ ]` | `0%` |
+| F3 | Motor PvE Básico (MVP Jugable vs. Máquina) | `[~]` | `20%` |
 | F4 | Reglas Completas e IA Mejorada | `[ ]` | `0%` |
 
 ---
@@ -38,7 +38,7 @@
 
 ## F3 — Motor PvE Básico (MVP Jugable vs. Máquina)
 
-- [ ] **F3.1** — Modelar `GameState`, `PlayerState`, `GameAction`, `GameEvent`, proyección `PlayerViewDTO` (ocultando mano/mazo rival) y máquina de estados de turno en Java puro. | *Módulos/archivos:* `game-engine`. | *Hecho:* tests JUnit 5 validan transiciones de fase y ausencia de fugas de información oculta.
+- [x] **F3.1** — Modelar `GameState`, `PlayerState`, `GameAction`, `GameEvent`, proyección `PlayerViewDTO` (ocultando mano/mazo rival) y máquina de estados de turno en Java puro. | *Módulos/archivos:* `game-engine`. | *Hecho:* tests JUnit 5 validan transiciones de fase y ausencia de fugas de información oculta.
 - [ ] **F3.2** — Implementar flujo jugable núcleo en `game-engine` (setup + mulligan, 6 premios, robo, bajar Básicos a banca, 1 energía/turno, ataque daño base + costo, KO, premios, promoción y victoria) emitiendo `GameEvent`. | *Módulos/archivos:* `game-engine`. | *Hecho:* tests JUnit 5 corren partidas núcleo en milisegundos sin Spring ni BD.
 - [ ] **F3.3** — Implementar interfaz `BotStrategy`, `BasicBotStrategy` y `BotTurnRunner` en Java puro usando solo `PlayerViewDTO` del Bot y emitiendo `GameAction` válidos. | *Módulos/archivos:* `bot-ai`, `game-engine`. | *Hecho:* test JUnit 5 simula partida completa Bot vs. Bot sin errores ni bucles infinitos.
 - [ ] **F3.4** — Crear migración `V4__matches_schema.sql` (snapshot `JSONB` + `@Version`) y API REST PvE (`POST /api/matches`, `GET /api/matches/{id}`, `POST /api/matches/{id}/actions`, `POST /api/matches/{id}/concede`) que ejecuta acción humana + turno Bot y devuelve `PlayerViewDTO` + `List<GameEvent>`. | *Módulos/archivos:* `match-api`, `/database/migrations`. | *Hecho:* partida completa verificada por tests de API/controlador con eventos humano+CPU.
@@ -74,3 +74,4 @@
 | 2026-11-23 | F2.3 | Anotados `CatalogStartupInitializer` (`@Order(10)`) y `StarterDeckSeeder` (`@Order(20)`) sembrando 3 *starter decks* de 60 cartas de `base1` (`Brushfire`, `Zap! & Torrent`, `Blackout`) + endpoints `GET /api/decks/starters` y `POST /api/decks/starters/{id}/clone`. Verificado: `mvn test` (`28/28`) en verde comprobando validez, idempotencia y clonado en PostgreSQL. | F2.4 |
 | 2026-11-23 | F2.4 | Implementadas vistas `/login` y `/register` con formularios reactivos, `AuthStore` (Signals + persistencia JWT), `jwtInterceptor`, `authGuard`/`guestGuard`, resumen de perfil en Home (`/`) y toggle de favoritas en `CardDetailModalComponent`. Verificado: `ng build` y `ng test` (`4/4` ChromeHeadless) en verde. | F2.5 |
 | 2026-11-23 | F2.5 | Implementado Deck Builder en Angular (`DeckListPageComponent` `/decks`, editor a 2 paneles `DeckEditorPageComponent` `/decks/new` y `/decks/:id`, `DeckBuilderStore` y `DeckValidationBarComponent` en vivo) protegido por `authGuard`. Verificado: `ng build` y `ng test` (`6/6` ChromeHeadless) en verde. **Fase F2 completada (100%).** | F3.1 |
+| 2026-11-23 | F3.1 | Modelado núcleo `com.pokemontcg.engine` en Java puro mediante `record`s sin prefijos `get*`/`is*` (`GameState`, `PlayerState`, `PokemonInPlay`, `CardDefinition`, `GameAction` sellada, `GameEvent`, `EnergyCostMatcher` y `PlayerViewProjector` con `AttackViewDTO.canPay` y ocultación estricta de mano/mazo/premios rival). Verificado: `mvn test` (`34/34`) incluyendo `EngineArchitectureTest`, `EnergyCostMatcherTest` y `PlayerViewProjectorTest`. | F3.2 |
