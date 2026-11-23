@@ -7,7 +7,7 @@
 | ID | Fase | Estado | Avance |
 | :--- | :--- | :---: | :---: |
 | F1 | Monorepo, Infraestructura y Catálogo | `[x]` | `100%` |
-| F2 | Usuarios, Deck Builder y Mazos Prearmados | `[~]` | `20%` |
+| F2 | Usuarios, Deck Builder y Mazos Prearmados | `[~]` | `40%` |
 | F3 | Motor PvE Básico (MVP Jugable vs. Máquina) | `[ ]` | `0%` |
 | F4 | Reglas Completas e IA Mejorada | `[ ]` | `0%` |
 
@@ -27,7 +27,7 @@
 ## F2 — Usuarios, Deck Builder y Mazos Prearmados
 
 - [x] **F2.1** — Crear migración `V2__users_schema.sql`, seguridad stateless JWT + BCrypt y endpoints `/api/auth/register`, `/api/auth/login`, `/api/users/me` y favoritas. | *Módulos/archivos:* `auth-users`, `/database/migrations`. | *Hecho:* flujo registro/login/token verificado y tests de seguridad en verde.
-- [ ] **F2.2** — Crear migración `V3__decks_schema.sql`, validador puro `DeckValidator` (60 cartas, máx. 4 copias por nombre salvo Energías Básicas, ≥1 Pokémon Básico) y CRUD `/api/decks`. | *Módulos/archivos:* `deck-builder`, `/database/migrations`. | *Hecho:* batería JUnit 5 de reglas de mazo y tests CRUD en verde.
+- [x] **F2.2** — Crear migración `V3__decks_schema.sql`, validador puro `DeckValidator` (60 cartas, máx. 4 copias por nombre salvo Energías Básicas, ≥1 Pokémon Básico) y CRUD `/api/decks`. | *Módulos/archivos:* `deck-builder`, `/database/migrations`. | *Hecho:* batería JUnit 5 de reglas de mazo y tests CRUD en verde.
 - [ ] **F2.3** — Implementar seeder idempotente de ≥2 mazos prearmados (`starter decks` válidos de `base1` reutilizables por jugador y CPU) + endpoint de listado y clonado. | *Módulos/archivos:* `deck-builder`. | *Hecho:* starters cargados pasan `DeckValidator` y se listan/clonan vía API.
 - [ ] **F2.4** — Implementar Auth (`/login`, `/register`) con formularios reactivos, `AuthStore` (Signals), interceptor JWT, `authGuard` y resumen de perfil en Home (`/`). | *Módulos/archivos:* `web-app-core`, `auth-users`. | *Hecho:* usuario se autentica en la UI, persiste sesión y accede a rutas protegidas.
 - [ ] **F2.5** — Implementar Deck Builder: listado de mazos propios y starters clonables (`/decks`) y editor a 2 paneles (`/decks/:id`) con barra de validación en vivo (60 cartas, máx. 4 por nombre salvo Energías Básicas, ≥1 Básico). | *Módulos/archivos:* `web-app-core`, `deck-builder`. | *Hecho:* usuario arma/edita/guarda un mazo válido o clona un starter desde el navegador.
@@ -70,3 +70,4 @@
 | 2026-11-23 | F1.3 | Expuestos DTOs `record`, `CardSpecifications` (filtro `type` sobre `card_types`), `CatalogQueryService` (orden numérico `sort_order`), `CatalogController` (`GET /api/sets`, `GET /api/cards`, `GET /api/cards/{id}`) y `CatalogAdminController`. Verificado: `mvn test` (12/12 incluyendo `@WebMvcTest` e integración con PostgreSQL real) y consulta HTTP en vivo (`102` cartas orden `1..5`, filtro `Fire`, `base1-96` `Special`). | F1.4 |
 | 2026-11-23 | F1.4 | Implementada SPA Angular 18+ (`AppShellComponent`, `HomeComponent`, `CatalogStore`, `CatalogPageComponent`, `CardTileComponent`, `CardDetailModalComponent`, `EnergyBadgeComponent`, `FeaturePlaceholderComponent` para `/decks`, `/play/setup`, `/login`, `/register`). Verificado: `ng build`, `ng test` (`2/2` ChromeHeadless) y 0 llamadas externas a TCGdex. **Fase F1 completada (100%).** | F2.1 |
 | 2026-11-23 | F2.1 | Creada migración `V2__users_schema.sql` (`users` con índices únicos funcionales `LOWER(username)` y `LOWER(email)` + `user_favorite_cards`), `JwtService`, `JwtAuthenticationFilter`, `SecurityConfig` stateless, `AuthController`, `UserController` y `UserStatsService`. Verificado: Flyway aplicó `V2` en PostgreSQL y `mvn test` (`20/20` tests unitarios, seguridad y PostgreSQL) en verde. | F2.2 |
+| 2026-11-23 | F2.2 | Creada migración `V3__decks_schema.sql`, validador puro `DeckValidator` (consolidación de `cardId`, 60 cartas, máx. 4 copias por nombre salvo Energías Básicas `'Basic'`/`'Normal'`, `≥1` Pokémon Básico) y CRUD `/api/decks` (`DeckService`, `DeckController`) con borradores y control `403`. Verificado: Flyway aplicó `V3` y `mvn test` (`27/27`) en verde. | F2.3 |
