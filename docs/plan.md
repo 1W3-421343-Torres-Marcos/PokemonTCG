@@ -8,7 +8,7 @@
 | :--- | :--- | :---: | :---: |
 | F1 | Monorepo, Infraestructura y Catálogo | `[x]` | `100%` |
 | F2 | Usuarios, Deck Builder y Mazos Prearmados | `[x]` | `100%` |
-| F3 | Motor PvE Básico (MVP Jugable vs. Máquina) | `[~]` | `40%` |
+| F3 | Motor PvE Básico (MVP Jugable vs. Máquina) | `[~]` | `60%` |
 | F4 | Reglas Completas e IA Mejorada | `[ ]` | `0%` |
 
 ---
@@ -40,7 +40,7 @@
 
 - [x] **F3.1** — Modelar `GameState`, `PlayerState`, `GameAction`, `GameEvent`, proyección `PlayerViewDTO` (ocultando mano/mazo rival) y máquina de estados de turno en Java puro. | *Módulos/archivos:* `game-engine`. | *Hecho:* tests JUnit 5 validan transiciones de fase y ausencia de fugas de información oculta.
 - [x] **F3.2** — Implementar flujo jugable núcleo en `game-engine` (setup + mulligan, 6 premios, robo, bajar Básicos a banca, 1 energía/turno, ataque daño base + costo, KO, premios, promoción y victoria) emitiendo `GameEvent`. | *Módulos/archivos:* `game-engine`. | *Hecho:* tests JUnit 5 corren partidas núcleo en milisegundos sin Spring ni BD.
-- [ ] **F3.3** — Implementar interfaz `BotStrategy`, `BasicBotStrategy` y `BotTurnRunner` en Java puro usando solo `PlayerViewDTO` del Bot y emitiendo `GameAction` válidos. | *Módulos/archivos:* `bot-ai`, `game-engine`. | *Hecho:* test JUnit 5 simula partida completa Bot vs. Bot sin errores ni bucles infinitos.
+- [x] **F3.3** — Implementar interfaz `BotStrategy`, `BasicBotStrategy` y `BotTurnRunner` en Java puro usando solo `PlayerViewDTO` del Bot y emitiendo `GameAction` válidos. | *Módulos/archivos:* `bot-ai`, `game-engine`. | *Hecho:* test JUnit 5 simula partida completa Bot vs. Bot sin errores ni bucles infinitos.
 - [ ] **F3.4** — Crear migración `V4__matches_schema.sql` (snapshot `JSONB` + `@Version`) y API REST PvE (`POST /api/matches`, `GET /api/matches/{id}`, `POST /api/matches/{id}/actions`, `POST /api/matches/{id}/concede`) que ejecuta acción humana + turno Bot y devuelve `PlayerViewDTO` + `List<GameEvent>`. | *Módulos/archivos:* `match-api`, `/database/migrations`. | *Hecho:* partida completa verificada por tests de API/controlador con eventos humano+CPU.
 - [ ] **F3.5** — Implementar Setup de Partida (`/play/setup`), botón de retomar partida activa en Home (`/`) y Tablero de Combate (`/play/:matchId`) con Zona Rival, Zona Jugador, HUD de ataques/turno/fase, descarte inspeccionable, Historial de Combate secuencial (`GameEvent` del Bot) y modal de Victoria/Derrota. | *Módulos/archivos:* `web-battle-board`, `web-app-core`, `match-api`. | *Hecho:* usuario completa una partida jugable de principio a fin contra la CPU desde la web.
 
@@ -76,3 +76,4 @@
 | 2026-11-23 | F2.5 | Implementado Deck Builder en Angular (`DeckListPageComponent` `/decks`, editor a 2 paneles `DeckEditorPageComponent` `/decks/new` y `/decks/:id`, `DeckBuilderStore` y `DeckValidationBarComponent` en vivo) protegido por `authGuard`. Verificado: `ng build` y `ng test` (`6/6` ChromeHeadless) en verde. **Fase F2 completada (100%).** | F3.1 |
 | 2026-11-23 | F3.1 | Modelado núcleo `com.pokemontcg.engine` en Java puro mediante `record`s sin prefijos `get*`/`is*` (`GameState`, `PlayerState`, `PokemonInPlay`, `CardDefinition`, `GameAction` sellada, `GameEvent`, `EnergyCostMatcher` y `PlayerViewProjector` con `AttackViewDTO.canPay` y ocultación estricta de mano/mazo/premios rival). Verificado: `mvn test` (`34/34`) incluyendo `EngineArchitectureTest`, `EnergyCostMatcherTest` y `PlayerViewProjectorTest`. | F3.2 |
 | 2026-11-23 | F3.2 | Implementado `GameEngine` y `RandomProvider` en Java puro (`initializeMatch`, mulligan por diferencia neta acotado al mazo, `turnNumber` incremental por turno, límite de 5 en banca, 1 energía/turno, bloqueo de ataque en Turno 1, KO + premio + promoción obligatoria y 4 condiciones de victoria). Verificado: `mvn test` (`41/41`), corriendo `GameEngineTest` en `52 ms` sin Spring ni BD. | F3.3 |
+| 2026-11-23 | F3.3 | Implementada IA CPU en Java puro (`BotDifficulty`, `BotStrategy`, `BasicBotStrategy` leyendo solo `PlayerViewDTO` + `attack.canPay()`, y `BotTurnRunner` con guardia `MAX_ACTIONS_PER_TURN = 25`). Verificado: `mvn test` (`48/48`) en verde incluyendo `BotArchitectureTest`, `BasicBotStrategyTest` y `BotVsBotSimulationTest` (5 partidas completas de 60 cartas hasta `GAME_OVER`). | F3.4 |
